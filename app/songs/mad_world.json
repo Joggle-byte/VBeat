@@ -1,0 +1,17 @@
+{
+    "name" : "Mad World",
+    "tracks" : [
+        {
+            "name" : "sequenza",
+            "path" : "C:/Users/emaal/Dropbox/Scambio Lady Godiva/Sequenze/Mad_world_sequenza.wav",
+            "volume" : 1.0,
+            "device" : 10
+        },
+        {
+            "name" : "click",
+            "path" : "C:/Users/emaal/Dropbox/Scambio Lady Godiva/Sequenze/Mad_World_click.wav",
+            "volume" : 1.0,
+            "device" : 7
+        }
+    ]
+}

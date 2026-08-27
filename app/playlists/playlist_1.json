@@ -1,0 +1,8 @@
+{
+    "name" : "Playlist 1",
+    "songs" : [
+        "C:/Users/emaal/cpp_games/LivePlay/songs/mad_world.json",
+        "C:/Users/emaal/cpp_games/LivePlay/songs/heart_attack.json",
+        "C:/Users/emaal/cpp_games/LivePlay/songs/have_a_nice_day.json"
+    ]
+}

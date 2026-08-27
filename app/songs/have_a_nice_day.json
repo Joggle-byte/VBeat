@@ -1,0 +1,11 @@
+{
+    "name" : "Have a nice day - Bon Jovi",
+    "tracks" : [
+        {
+            "name" : "main",
+            "path" : "C:/Users/emaal/OneDrive/Desktop/mp3/Bon Jovi - Have a nice day.mp3",
+            "volume" : 1.0,
+            "device" : 10
+        }
+    ]
+}
