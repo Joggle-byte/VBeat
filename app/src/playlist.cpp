@@ -40,7 +40,25 @@ Playlist* Playlist::create_from_file(const std::string& path) {
 }
 
 bool Playlist::save_to_file(const std::string& path) {
+    std::ofstream file(path);
 
+    if(!file.is_open()) {
+        std::cerr << "[Playlist exporter] failed to open file " << path << std::endl;
+        return false;
+    }
+
+    json j;
+
+    j["name"] = name;
+    j["songs"] = json::array();
+
+    for(const auto& s : song_paths)
+        j["songs"].push_back(s);
+    
+    file << std::setw(4) << j << std::endl;
+    file.close();
+
+    return true;
 }
 
 bool Playlist::is_valid_song_id(int id) const {

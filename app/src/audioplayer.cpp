@@ -19,6 +19,13 @@ void AudioPlayer::clear_queue() {
     queued_songs.clear();
 }
 
+Song* AudioPlayer::get_queued_song(int song_id) const {
+    if(!is_valid_song_id(song_id)) return nullptr;
+
+    return queued_songs[song_id];
+}
+
+
 bool AudioPlayer::load_song(Song* new_song) {
     if(!new_song) return false;
 

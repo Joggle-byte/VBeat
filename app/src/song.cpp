@@ -1,6 +1,7 @@
 #include "../include/song.hpp"
 #include <fstream>
 #include <iostream>
+#include <iomanip>
 #include "../include/json.hpp"
 
 using json = nlohmann::json;
@@ -33,12 +34,12 @@ void Song::set_track_volume(int track_id, float vol) {
         tracks[track_id].volume = vol;
 }
 
-void Song::set_track_filepath(int track_id, std::string path) {
+void Song::set_track_filepath(int track_id, const std::string& path) {
     if (is_valid_track_id(track_id))
         tracks[track_id].file_path = path;
 }
 
-void Song::set_track_name(int track_id, std::string new_name) {
+void Song::set_track_name(int track_id, const std::string& new_name) {
     if (is_valid_track_id(track_id))
         tracks[track_id].name = new_name;
 }
@@ -55,10 +56,8 @@ bool Song::is_valid_track_id(int track_id) const {
 
 Song* Song::create_from_file(const std::string& path) {
     std::ifstream file(path);
-    if (!file.is_open()) {
-        std::cerr << "[Song importer] failed to open file " << path << std::endl;
+    if (!file.is_open())
         return nullptr;
-    }
 
     Song* new_song = new Song();
 
@@ -80,5 +79,30 @@ Song* Song::create_from_file(const std::string& path) {
 }
 
 bool Song::save_to_file(const std::string& path) {
+    std::ofstream file(path);
 
+    if(!file.is_open()) {
+        std::cerr << "[Song exporter] failed to open file " << path << std::endl;
+        return false;
+    }
+
+    json j;
+
+    j["name"] = name;
+    j["tracks"] = json::array();
+
+    for(const auto& t : tracks) {
+        json track;
+        track["name"] = t.name;
+        track["path"] = t.file_path;
+        track["volume"] = t.volume;
+        track["device"] = t.device_id;
+        
+        j["tracks"].push_back(track);
+    }
+
+    file << std::setw(4) << j << std::endl;
+    file.close();
+
+    return true;
 }

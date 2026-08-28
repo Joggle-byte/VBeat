@@ -31,6 +31,8 @@ public:
 
     size_t bus_count() const { return busses.size(); }
 
+    Song* get_queued_song(int song_id) const;
+
 private:
     Song* playing_song;
     std::vector<Song*> queued_songs;

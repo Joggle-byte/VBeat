@@ -15,8 +15,8 @@ public:
     bool remove_track(int track_id);
 
     void set_track_volume(int track_id, float vol);
-    void set_track_filepath(int track_id, std::string path);
-    void set_track_name(int track_id, std::string new_name);
+    void set_track_filepath(int track_id, const std::string& path);
+    void set_track_name(int track_id, const std::string& new_name);
     void set_track_device(int track_id, int device);
 
     void set_name(const std::string& new_name) { name = new_name; }
