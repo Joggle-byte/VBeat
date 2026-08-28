@@ -15,7 +15,7 @@ void AudioPlayer::queue_song(Song* song) {
 }
 
 void AudioPlayer::clear_queue() {
-    playing_song = nullptr;
+    playing_song = -1;
     queued_songs.clear();
 }
 
@@ -35,7 +35,9 @@ bool AudioPlayer::load_song(Song* new_song) {
 
     std::vector<AudioTrack> tracks = new_song->get_tracks();
 
-    for(const auto& i : tracks)
+    clear_busses();
+
+    for(size_t i = 0; i < tracks.size(); i++)
         create_bus();
 
     for(size_t i = 0; i < bus_count(); i++) {
@@ -101,7 +103,7 @@ bool AudioPlayer::init_device(int device) {
         if (err == BASS_ERROR_ALREADY) {
             return true;
         }
-        std::cerr << "[AudioEngine] unable to initialize device " << device
+        std::cerr << "[AudioPlayer] unable to initialize device " << device
                    << " : " << err << "\n";
         return false;
     }
@@ -141,9 +143,11 @@ void AudioPlayer::play(int song_id, bool restart) {
         return;
     }
 
-    playing_song = queued_songs[song_id];
+    playing_song = song_id;
 
-    load_song(playing_song);
+    Song* current_song = queued_songs[playing_song];
+
+    if(!load_song(current_song)) return;
 
     for(auto& bus : busses) {
         bus.prepare_for_play();
@@ -153,11 +157,9 @@ void AudioPlayer::play(int song_id, bool restart) {
         bus.play(restart);
     }
 
-    std::cout << "\n[AudioPlayer] now playing '" << playing_song->get_name() << "'\n";
+    std::cout << "\n[AudioPlayer] now playing '" << current_song->get_name() << "'\n";
 
-    while(is_playing()) {
-        process_playing();
-    }
+    process_playing();
 }
 
 void AudioPlayer::play_queue() {
@@ -169,17 +171,32 @@ void AudioPlayer::play_queue() {
     for(size_t i = 0; i < queued_songs.size(); i++) {
         play(static_cast<int>(i));
 
+        if (i == queued_songs.size() - 1) return;
+
         char cmd;
-        std::cout << "\nNext song? (y/n) > ";
+        std::cout << "\nNext song : " << queued_songs[i + 1]->get_name() << " (y/n) > ";
         std::cin >> cmd;
+        std::cin.ignore();
 
         if(cmd != 'y') return;
     }
 }
 
 void AudioPlayer::pause() {
+    paused = true;
     for(size_t i = 0; i < bus_count(); i++) {
         busses[i].pause();
+    }
+}
+
+void AudioPlayer::resume() {
+    paused = false;
+    for(auto& bus : busses) {
+        bus.prepare_for_play();
+    }
+
+    for(auto& bus : busses) {
+        bus.play(false);
     }
 }
 
@@ -188,7 +205,7 @@ void AudioPlayer::stop() {
         busses[i].stop();
     }
 
-    playing_song = nullptr;
+    playing_song = -1;
 }
 
 bool AudioPlayer::is_playing() {
@@ -196,7 +213,7 @@ bool AudioPlayer::is_playing() {
     for(size_t i = 0; i < bus_count(); i++) {
         ret |= busses[i].is_playing();
     }
-    return ret;
+    return ret || paused;
 }
 
 void AudioPlayer::set_volume(int bus_id, float vol) {
@@ -213,5 +230,13 @@ bool AudioPlayer::is_valid_song_id(int id) const {
 
 
 void AudioPlayer::process_playing() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    while(is_playing()) {
+        std::string command;
+        std::getline(std::cin, command);
+        
+        if(command == "s") stop();
+        else if(command == "p") pause();
+        else if(command == "r") resume();
+    }
+    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }

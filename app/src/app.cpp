@@ -76,8 +76,13 @@ void App::load_all_playlists(const std::string& bank_path) {
 void App::list_playlists() {
     std::cout << "\n========== PLAYLISTS ==========\n";
 
-    for(size_t i = 0; i < playlists.size(); i++)
+    for(size_t i = 0; i < playlists.size(); i++) {
         std::cout << i+1 << ". " << playlists[i]->get_name() << "\n";
+        
+        std::vector<std::string> songs = playlists[i]->get_songs();
+        for(size_t i = 0; i < songs.size(); i++)
+            std::cout << "\t" << i + 1 << ". " << song_bank.get_song(songs[i])->get_name() << "\n";
+    }
 }
 
 
@@ -109,6 +114,24 @@ void App::cli_loop() {
             list_playlists();
         else if(command == "quit")
             running = false;
+        else if(command == "play p") {
+            list_playlists();
+            std::cout << "\nPlaylist id > ";
+            
+            int id;
+            std::cin >> id;
+            std::cin.ignore();
+
+            id--;
+
+            if(id >= 0 && (size_t)id < playlists.size()) {
+                for(auto& i : playlists[id]->get_songs()) {
+                    main_player.queue_song(song_bank.get_song(i));
+                }
+                main_player.play_queue();
+            }
+            else std::cout << "\nInvalid ID. Cancelling\n";
+        }
         else
             std::cout << ERROR_COL << " invalid command : " << END << command << "\n";
     }

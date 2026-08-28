@@ -1,7 +1,7 @@
 CXX      = g++
-CXXFLAGS = -Wall -Iinclude
+CXXFLAGS = -Wall -Iinclude -Iinclude/raylib
 LDFLAGS  = -Llib
-LDLIBS   = -lbass
+LDLIBS   = -lbass -llibraylib
 
 # Directories
 SRC_DIR  = src

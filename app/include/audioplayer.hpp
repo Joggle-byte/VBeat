@@ -21,11 +21,12 @@ public:
 
     bool load_playlist(Playlist* playlist);
 
-    void play(int song_id, bool restart = false);
+    void play(int song_id, bool restart = true);
     void play_queue();
 
     void pause();
     void stop();
+    void resume();
 
     bool is_playing();
 
@@ -34,9 +35,11 @@ public:
     Song* get_queued_song(int song_id) const;
 
 private:
-    Song* playing_song;
+    int playing_song;
     std::vector<Song*> queued_songs;
     std::vector<AudioBus> busses;
+
+    bool paused = false;
 
     void process_playing();
 

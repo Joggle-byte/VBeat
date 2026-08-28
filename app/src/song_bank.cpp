@@ -88,6 +88,10 @@ Song* SongBank::get_song(const std::string& path) {
     return nullptr;
 }
 
+Song* SongBank::get_song_by_index(int idx) {
+}
+
+
 bool SongBank::song_exists(const std::string& path) {
     auto it = bank.find(fs::path(path));
     return (it != bank.end());
