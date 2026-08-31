@@ -28,9 +28,14 @@ public:
 
     void free();
 
+    std::pair<double, double> get_playback_duration_info() const;
+
+    std::pair<float, float> get_stereo_audio_levels() const;
+
     HSTREAM get_handle() const { return handle; }
     int get_device() const { return track.device_id; }
     const std::string& get_file_path() const { return file_path; }
+    AudioTrack get_track() const { return track; }
 
 private:
     

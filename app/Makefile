@@ -1,7 +1,7 @@
 CXX      = g++
-CXXFLAGS = -Wall -Iinclude -Iinclude/raylib
+CXXFLAGS = -std=c++17 -Wall -Iinclude
 LDFLAGS  = -Llib
-LDLIBS   = -lbass -llibraylib
+LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen -pthread
 
 # Directories
 SRC_DIR  = src

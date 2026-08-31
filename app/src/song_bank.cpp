@@ -88,7 +88,15 @@ Song* SongBank::get_song(const std::string& path) {
     return nullptr;
 }
 
-Song* SongBank::get_song_by_index(int idx) {
+std::vector<Song*> SongBank::get_songs() {
+    std::vector<Song*> values;
+    values.reserve(bank.size());
+
+    for (const auto& s : bank) {
+        values.push_back(s.second);
+    }
+
+    return values;
 }
 
 

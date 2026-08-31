@@ -21,7 +21,7 @@ public:
 
     Song* get_song(const std::string& path);
 
-    Song* get_song_by_index(int idx);
+    std::vector<Song*> get_songs();
 
     bool song_exists(const std::string& path);
 

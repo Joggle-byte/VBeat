@@ -19,6 +19,11 @@ void AudioPlayer::clear_queue() {
     queued_songs.clear();
 }
 
+void AudioPlayer::set_queue(std::vector<Song*> new_queue) {
+    queued_songs = new_queue;
+    playing_song = 0;
+}
+
 Song* AudioPlayer::get_queued_song(int song_id) const {
     if(!is_valid_song_id(song_id)) return nullptr;
 
@@ -30,8 +35,6 @@ bool AudioPlayer::load_song(Song* new_song) {
     if(!new_song) return false;
 
     std::cout << "[AudioPlayer] loading song '" << new_song->get_name() << "'...\n";
-
-    //clear_busses();
 
     std::vector<AudioTrack> tracks = new_song->get_tracks();
 
@@ -137,7 +140,7 @@ bool AudioPlayer::route_channel(int bus_id, int new_device) {
     return busses[bus_id].route_to_device(new_device);
 }
 
-void AudioPlayer::play(int song_id, bool restart) {
+void AudioPlayer::play(int song_id) {
     if (!is_valid_song_id(song_id)) {
         std::cerr << "[AudioPlayer] queued song with id " << song_id << " doesn't exist\n";
         return;
@@ -154,12 +157,14 @@ void AudioPlayer::play(int song_id, bool restart) {
     }
 
     for(auto& bus : busses) {
-        bus.play(restart);
+        bus.play(should_restart);
     }
 
     std::cout << "\n[AudioPlayer] now playing '" << current_song->get_name() << "'\n";
+}
 
-    process_playing();
+void AudioPlayer::play_current() {
+    play(playing_song);
 }
 
 void AudioPlayer::play_queue() {
@@ -208,12 +213,19 @@ void AudioPlayer::stop() {
     playing_song = -1;
 }
 
+Song* AudioPlayer::get_next_song() const {
+    if (playing_song < static_cast<int>(queued_songs.size()) - 1)
+        return queued_songs[playing_song + 1];
+    return nullptr;
+}
+
+
 bool AudioPlayer::is_playing() {
     bool ret = false;
     for(size_t i = 0; i < bus_count(); i++) {
         ret |= busses[i].is_playing();
     }
-    return ret || paused;
+    return ret;
 }
 
 void AudioPlayer::set_volume(int bus_id, float vol) {
@@ -228,15 +240,42 @@ bool AudioPlayer::is_valid_song_id(int id) const {
     return id >= 0 && id < static_cast<int>(queued_songs.size());
 }
 
-
-void AudioPlayer::process_playing() {
-    while(is_playing()) {
-        std::string command;
-        std::getline(std::cin, command);
-        
-        if(command == "s") stop();
-        else if(command == "p") pause();
-        else if(command == "r") resume();
-    }
-    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+std::pair<double, double> AudioPlayer::get_bus_playback_info(int bus_id) {
+    if(is_valid_bus(bus_id)) return busses[bus_id].get_playback_duration_info();
+    return {0.0f, 0.0f};
 }
+
+int AudioPlayer::get_longest_bus_id() {
+    if(busses.empty()) return -1;
+    if(busses.size() == 1) return 0;
+
+    double greater = busses[0].get_playback_duration_info().second;
+    int id = 0;
+
+    for(size_t i = 1; i < busses.size(); i++) {
+        double curr_len = busses[i].get_playback_duration_info().second;
+        if(curr_len > greater) {
+            greater = curr_len;
+            id = i;
+        };
+    }
+
+    return id;
+}
+
+AudioBus* AudioPlayer::get_bus(int bus_id) {
+    if(is_valid_bus(bus_id)) return &busses[bus_id];
+    return nullptr;
+}
+
+std::vector<std::pair<float, float>> AudioPlayer::get_bus_levels() {
+    std::vector<std::pair<float, float>> ret;
+    
+    ret.reserve(busses.size());
+
+    for(const auto& b : busses)
+        ret.push_back(b.get_stereo_audio_levels());
+    
+    return ret;
+}
+

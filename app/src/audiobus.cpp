@@ -97,4 +97,20 @@ void AudioBus::free() {
     }
 }
 
+std::pair<double, double> AudioBus::get_playback_duration_info() const {
+    QWORD pos = BASS_ChannelGetPosition(handle, BASS_POS_BYTE);
+    QWORD len = BASS_ChannelGetLength(handle, BASS_POS_BYTE);
 
+    double posSec = BASS_ChannelBytes2Seconds(handle, pos);
+    double lenSec = BASS_ChannelBytes2Seconds(handle, len);
+    return std::pair<double, double>(posSec, lenSec);
+}
+
+std::pair<float, float> AudioBus::get_stereo_audio_levels() const {
+    float levels[2] = {0.0f, 0.0f};
+
+    if (BASS_ChannelGetLevelEx(handle, levels, 0.02f, BASS_LEVEL_STEREO))
+        return {levels[0], levels[1]};
+    
+    return {0.0f, 0.0f};
+}

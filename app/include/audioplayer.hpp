@@ -4,6 +4,7 @@
 #include "song.hpp"
 #include "playlist.hpp"
 #include <vector>
+#include <functional>
 
 
 class AudioPlayer {
@@ -16,12 +17,14 @@ public:
     void list_song_queue();
 
     void queue_song(Song* song);
+    void set_queue(std::vector<Song*> new_queue);
 
     void clear_queue();
 
     bool load_playlist(Playlist* playlist);
 
-    void play(int song_id, bool restart = true);
+    void play(int song_id);
+    void play_current();
     void play_queue();
 
     void pause();
@@ -30,9 +33,21 @@ public:
 
     bool is_playing();
 
+    bool is_paused() const { return paused; }
+
     size_t bus_count() const { return busses.size(); }
 
+    AudioBus* get_bus(int bus_id);
+
     Song* get_queued_song(int song_id) const;
+
+    Song* get_next_song() const;
+
+    int get_longest_bus_id();
+    
+    std::vector<std::pair<float, float>> get_bus_levels();
+
+    std::pair<double, double> get_bus_playback_info(int bus_id);
 
 private:
     int playing_song;
@@ -40,6 +55,8 @@ private:
     std::vector<AudioBus> busses;
 
     bool paused = false;
+
+    bool should_restart = false;
 
     void process_playing();
 
