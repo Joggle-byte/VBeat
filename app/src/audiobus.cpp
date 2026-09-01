@@ -16,10 +16,8 @@ bool AudioBus::load(const AudioTrack& new_track) {
     free();
 
     handle = BASS_StreamCreateFile(FALSE, new_track.file_path.c_str(), 0, 0, 0);
-
     if (!handle) {
         std::cerr << "[AudioBus " << new_track.name << "] unable to load file '" << new_track.file_path << "' : " << BASS_ErrorGetCode() << "\n";
-    
         return false;
     }
 

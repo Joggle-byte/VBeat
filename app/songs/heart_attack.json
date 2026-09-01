@@ -3,9 +3,9 @@
     "tracks" : [
         {
             "name" : "main",
-            "path" : "C:/Users/emaal/OneDrive/Desktop/mp3/Demi Lovato - Heart Attack (Lyrics).mp3",
+            "path" : "/Users/emaalf/Desktop/audio/Demi Lovato - Heart Attack (Lyrics).mp3",
             "volume" : 1.0,
-            "device" : 10
+            "device" : 1
         }
     ]
 }

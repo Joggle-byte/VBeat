@@ -6,7 +6,7 @@
 #include "song_editor.hpp"
 #include "song_bank.hpp"
 
-#define CONFIG_FILE_PATH "C:/Users/emaal/cpp_games/VBeat/app/config.json"
+#define CONFIG_FILE_PATH "/Users/emaalf/Documents/repos/VBeat/app/config.json"
 
 namespace ui = ftxui;
 

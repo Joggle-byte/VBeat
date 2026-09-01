@@ -3,15 +3,15 @@
     "tracks" : [
         {
             "name" : "sequenza",
-            "path" : "C:/Users/emaal/Dropbox/Scambio Lady Godiva/Sequenze/Mad_world_sequenza.wav",
+            "path" : "/Users/emaalf/Desktop/audio/Mad_world_sequenza.wav",
             "volume" : 1.0,
-            "device" : 10
+            "device" : 1
         },
         {
             "name" : "click",
-            "path" : "C:/Users/emaal/Dropbox/Scambio Lady Godiva/Sequenze/Mad_World_click.wav",
+            "path" : "/Users/emaalf/Desktop/audio/Mad_World_click.wav",
             "volume" : 1.0,
-            "device" : 7
+            "device" : 1
         }
     ]
 }

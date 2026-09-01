@@ -1,8 +1,8 @@
 {
     "name" : "Playlist 1",
     "songs" : [
-        "C:/Users/emaal/cpp_games/VBeat/app/songs/heart_attack.json",
-        "C:/Users/emaal/cpp_games/VBeat/app/songs/mad_world.json",
-        "C:/Users/emaal/cpp_games/VBeat/app/songs/have_a_nice_day.json"
+        "/Users/emaalf/Documents/repos/VBeat/app/songs/heart_attack.json",
+        "/Users/emaalf/Documents/repos/VBeat/app/songs/mad_world.json",
+        "/Users/emaalf/Documents/repos/VBeat/app/songs/have_a_nice_day.json"
     ]
 }

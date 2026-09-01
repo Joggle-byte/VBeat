@@ -1,12 +1,12 @@
-CXX      = g++
+CXX      = clang++
 CXXFLAGS = -std=c++17 -Wall -Iinclude
-LDFLAGS  = -Llib
-LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen -pthread
+LDFLAGS  = -Llib -L. -Wl,-rpath,@executable_path -framework AudioToolbox -framework CoreAudio -framework CoreFoundation
+LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen
 
 # Directories
 SRC_DIR  = src
 OBJ_DIR  = obj
-TARGET   = vbeat.exe
+TARGET   = vbeat
 
 SRCS     := main.cpp $(wildcard $(SRC_DIR)/*.cpp)
 
@@ -26,8 +26,10 @@ $(OBJ_DIR)/main.o: main.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR):
-	cmd /c if not exist $(OBJ_DIR) mkdir $(OBJ_DIR)
+	mkdir -p $(OBJ_DIR)
 
 clean:
-	cmd /c if exist $(OBJ_DIR) rmdir /s /q $(OBJ_DIR)
-	cmd /c if exist $(TARGET) del /f /q $(TARGET)
+	rm -rf $(OBJ_DIR)
+	rm -f $(TARGET)
+
+.PHONY: all clean

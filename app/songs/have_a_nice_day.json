@@ -3,9 +3,9 @@
     "tracks" : [
         {
             "name" : "main",
-            "path" : "C:/Users/emaal/OneDrive/Desktop/mp3/Bon Jovi - Have a nice day.mp3",
+            "path" : "/Users/emaalf/Desktop/audio/Bon Jovi - Have a nice day.mp3",
             "volume" : 1.0,
-            "device" : 10
+            "device" : 1
         }
     ]
 }

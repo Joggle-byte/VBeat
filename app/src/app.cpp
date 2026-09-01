@@ -21,10 +21,12 @@ App::~App() {
 int App::main() {
     std::cout << END;
 
-    std::system("cls");
+    std::system("clear && printf '\e[3J'");
 
     std::cout << "VBeat " << VBEAT_VERSION << " - by Emanuele Alfieri\n\n";
     std::cout << " ===== Startup Log =====\n";
+
+    main_player.list_devices();
 
     if (!load_config_file()) return 1;
 
@@ -37,7 +39,7 @@ int App::main() {
 
     main_loop();
 
-    std::system("cls");
+    std::system("clear && printf '\e[3J'");
 
     return 0;
 }
@@ -78,7 +80,7 @@ void App::load_all_playlists(const std::string& bank_path) {
                 playlist->remove_song(i);
             }
         }
-
+        
         playlists.push_back(playlist);
     }
 
@@ -170,11 +172,11 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
 
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            std::system("cls");
+            std::system("clear && printf '\e[3J'");
             main_player.play(menu.get_selected_id());
-            std::system("cls");
+            std::system("clear && printf '\e[3J'");
             song_play_screen(main_player.get_queued_song(menu.get_selected_id()));
-            std::system("cls");
+            std::system("clear && printf '\e[3J'");
             menu.select_next();
             return true;
         }
