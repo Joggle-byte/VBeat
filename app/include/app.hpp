@@ -48,13 +48,12 @@ private:
 
     void main_loop();
 
+    void show_log();
+
     void playlist_selection();
     void song_selection();
 
     void song_queue_play_screen(const std::vector<Song*> queue);
 
     void song_play_screen(Song* song);
-
-    void playlist_creation();
-
 };

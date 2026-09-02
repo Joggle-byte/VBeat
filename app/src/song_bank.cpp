@@ -3,6 +3,7 @@
 #include "../include/json.hpp"
 #include "../include/bass.h"
 #include "../include/utils.hpp"
+#include "../include/logger.hpp"
 #include <fstream>
 #include <filesystem>
 #include <iostream>
@@ -31,11 +32,11 @@ void SongBank::load_all(const std::string& bank_path) {
         Song* s = Song::create_from_file(p.string());
 
         if(!s)
-            std::cerr << ERROR_COL << "[Song Bank] unable to load song '" << p.string() << "'\n" << END;
+            Logger::get_instance().log(std::string(ERROR_COL) + "[Song Bank] unable to load song '" + p.string() + "'" + std::string(END));
         else if(validate_song(s)) bank[p] = s;
     }
 
-    std::cout << "[Song Bank] song bank loaded succesfully\n";
+    Logger::get_instance().log("[Song Bank] song bank loaded succesfully");
 }
 
 bool SongBank::validate_song(Song* s) {
@@ -57,17 +58,15 @@ bool SongBank::validate_song(Song* s) {
     }
 
     if(!corrputed_tracks.empty()) {
-        std::cerr << ERROR_COL << "[Song Bank] cannot resolve tracks of song '" << s->get_name() << "' :\n";
+        Logger::get_instance().log_err("[Song Bank] cannot resolve tracks of song '" + s->get_name() + "' :");
         for(const auto& p : corrputed_tracks)
-            std::cerr << "\t> Track '" << p.name << "' (" << p.file_path << ")\n";
-        std::cout << END;
+            Logger::get_instance().log_err("\t> Track '" + p.name + "' (" + p.file_path + ")");
     }
 
     if(!unavailable_devices.empty()) {
-        std::cerr << WARNING << "[Song Bank] Unavailable audio devices found in song '" << s->get_name() << "' :\n";
+        Logger::get_instance().log_warn("[Song Bank] Unavailable audio devices found in song '" + s->get_name() + "' :");
         for(const auto i : unavailable_devices)
-            std::cerr << "\t> Device " << i << "\n";
-        std::cout << END;
+            Logger::get_instance().log_warn("\t> Device " + std::to_string(i));
     }
     
     return flag;
@@ -97,6 +96,13 @@ std::vector<Song*> SongBank::get_songs() {
     }
 
     return values;
+}
+
+Song* SongBank::create_song(const std::string& path) {
+    Song* s = new Song();
+    bank[fs::path(path)] = s;
+
+    return s;
 }
 
 

@@ -24,6 +24,8 @@ public:
     const std::vector<AudioTrack>& get_tracks() const { return tracks; }
     const std::string& get_name() const { return name; }
 
+    size_t get_tracks_count() const { return tracks.size(); }
+
     static Song* create_from_file(const std::string& path);
     bool save_to_file(const std::string& path);
 

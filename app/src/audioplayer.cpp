@@ -1,11 +1,14 @@
 #include "../include/audioplayer.hpp"
+#include "../include/logger.hpp"
+
 #include <iostream>
 #include <chrono>
-#include <thread>
+
 
 
 AudioPlayer::~AudioPlayer() {
     busses.clear();
+    //stop_preloader();
     BASS_Free();
 }
 
@@ -17,11 +20,14 @@ void AudioPlayer::queue_song(Song* song) {
 void AudioPlayer::clear_queue() {
     playing_song = -1;
     queued_songs.clear();
+    clear_busses();
 }
 
 void AudioPlayer::set_queue(std::vector<Song*> new_queue) {
     queued_songs = new_queue;
     playing_song = 0;
+
+    clear_busses();
 }
 
 Song* AudioPlayer::get_queued_song(int song_id) const {
@@ -31,33 +37,35 @@ Song* AudioPlayer::get_queued_song(int song_id) const {
 }
 
 
-bool AudioPlayer::load_song(Song* new_song) {
+bool AudioPlayer::load_song(const Song* new_song, bool verbose) {
     if(!new_song) return false;
 
-    std::cout << "[AudioPlayer] loading song '" << new_song->get_name() << "'...\n";
+    if(verbose) Logger::get_instance().log("[AudioPlayer] loading song '" + new_song->get_name() + "'...");
 
     std::vector<AudioTrack> tracks = new_song->get_tracks();
 
-    clear_busses();
+    bus_buffer.clear();
+    bus_buffer.reserve(tracks.size());
 
     for(size_t i = 0; i < tracks.size(); i++)
-        create_bus();
+        bus_buffer.push_back(AudioBus());
 
-    for(size_t i = 0; i < bus_count(); i++) {
-        if (!load_track(i, tracks[i])) {
-            std::cerr << "[AudioPlayer] unable to load song '" << new_song->get_name() << "'\n";
+    for(size_t i = 0; i < bus_buffer.size(); i++) {
+        if (!load_track(bus_buffer[i], tracks[i], verbose)) {
+            if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to load song '" + new_song->get_name() + "'");
+            bus_buffer.clear();
             return false;
-        } else std::cout << "[AudioPlayer] track '" << tracks[i].name << "' loaded succesfully\n";
+        } else if(verbose) Logger::get_instance().log("[AudioPlayer] track '" + tracks[i].name + "' loaded succesfully");
     }
 
-    std::cout << "[AudioPlayer] song '" << new_song->get_name() << "' loaded succesfully\n";
+    if(verbose) Logger::get_instance().log("[AudioPlayer] song '" + new_song->get_name() + "' loaded succesfully");
     return true;
 }
 
 bool AudioPlayer::load_playlist(Playlist* playlist) {
     if(!playlist) return false;
 
-    std::cout << "[AudioPlayer] loading playlist '" << playlist->get_name() << "'...\n";
+    Logger::get_instance().log("[AudioPlayer] loading playlist '" + playlist->get_name() + "'...");
 
     queued_songs.clear();
 
@@ -65,29 +73,34 @@ bool AudioPlayer::load_playlist(Playlist* playlist) {
         Song* song = Song::create_from_file(path);
 
         if(!song) {
-            std::cerr << "[AudioPlayer] unable to load playlist '" << playlist->get_name() << "'\n";
+            Logger::get_instance().log_err("[AudioPlayer] unable to load playlist '" + playlist->get_name() + "'");
             return false;
         }
         queue_song(song);
     }
 
-    std::cout << "[AudioPlayer] playlist '" << playlist->get_name() << "' loaded succesfully\n";
+    Logger::get_instance().log("[AudioPlayer] playlist '" + playlist->get_name() + "' loaded succesfully");
     return true;
+}
+
+void AudioPlayer::swap_buffers() {
+    //std::lock_guard<std::mutex> lock(mtx);
+    busses = std::move(bus_buffer);
+    bus_buffer.clear();
 }
 
 
 void AudioPlayer::list_devices() {
     BASS_DEVICEINFO info;
-    std::cout << "Index | Name                          | State\n";
-    std::cout << "---------------------------------------------\n";
+    Logger::get_instance().log("Index | Name                          | State");
+    Logger::get_instance().log("---------------------------------------------");
     for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
         bool enabled   = (info.flags & BASS_DEVICE_ENABLED) != 0;
         bool isDefault = (info.flags & BASS_DEVICE_DEFAULT) != 0;
  
-        std::cout << i << "      | " << info.name
-                  << (enabled ? " [active]" : " [unavailable]")
-                  << (isDefault ? " (default)" : "")
-                  << "\n";
+        Logger::get_instance().log(std::to_string(i) + "      | " + info.name
+                  + (enabled ? " [active]" : " [unavailable]")
+                  + (isDefault ? " (default)" : ""));
     }
 }
 
@@ -100,14 +113,14 @@ void AudioPlayer::list_song_queue() {
     std::cout << "\n";
 }
 
-bool AudioPlayer::init_device(int device) {
+bool AudioPlayer::init_device(int device, bool verbose) {
     if (!BASS_Init(device, 44100, 0, nullptr, nullptr)) {
         int err = BASS_ErrorGetCode();
         if (err == BASS_ERROR_ALREADY) {
             return true;
         }
-        std::cerr << "[AudioPlayer] unable to initialize device " << device
-                   << " : " << err << "\n";
+        if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to initialize device " + std::to_string(device)
+                   + " : " + std::to_string(err));
         return false;
     }
     return true;
@@ -124,14 +137,13 @@ int AudioPlayer::create_bus() {
 
 void AudioPlayer::clear_busses() {
     busses.clear();
+    bus_buffer.clear();
 }
 
-bool AudioPlayer::load_track(int bus_id, const AudioTrack& track) {
-    if (!is_valid_bus(bus_id)) return false;
+bool AudioPlayer::load_track(AudioBus& bus, const AudioTrack& track, bool verbose) {
+    if (!init_device(track.device_id, verbose)) return false;
 
-    if (!init_device(track.device_id)) return false;
-
-    return busses[bus_id].load(track);
+    return bus.load(track, verbose);
 }
 
 bool AudioPlayer::route_channel(int bus_id, int new_device) {
@@ -142,7 +154,7 @@ bool AudioPlayer::route_channel(int bus_id, int new_device) {
 
 void AudioPlayer::play(int song_id) {
     if (!is_valid_song_id(song_id)) {
-        std::cerr << "[AudioPlayer] queued song with id " << song_id << " doesn't exist\n";
+        Logger::get_instance().log_err("[AudioPlayer] queued song with id " + std::to_string(song_id) + " doesn't exist");
         return;
     }
 
@@ -150,7 +162,13 @@ void AudioPlayer::play(int song_id) {
 
     Song* current_song = queued_songs[playing_song];
 
-    if(!load_song(current_song)) return;
+    //{
+        //std::lock_guard<std::mutex> lock(mtx);
+        //if(bus_buffer.empty())
+            if(!load_song(current_song)) return;
+    //}
+
+    swap_buffers();
 
     for(auto& bus : busses) {
         bus.prepare_for_play();
@@ -160,16 +178,23 @@ void AudioPlayer::play(int song_id) {
         bus.play(should_restart);
     }
 
-    std::cout << "\n[AudioPlayer] now playing '" << current_song->get_name() << "'\n";
+    Logger::get_instance().log("[AudioPlayer] now playing '" + current_song->get_name() + "'\n");
+
+    //Song* next = get_next_song_looped();
+
+    //if(next)
+    //    preload_next_song(next, 0.5f);
 }
 
 void AudioPlayer::play_current() {
     play(playing_song);
 }
 
+
+// Deprecated
 void AudioPlayer::play_queue() {
     if(queued_songs.empty()) {
-        std::cerr << "[AudioPlayer] there are no songs in the queue\n";
+        Logger::get_instance().log_warn("[AudioPlayer] there are no songs in the queue");
         return;
     }
 
@@ -210,6 +235,7 @@ void AudioPlayer::stop() {
         busses[i].stop();
     }
 
+    //stop_preloader();
     playing_song = -1;
 }
 
@@ -219,6 +245,11 @@ Song* AudioPlayer::get_next_song() const {
     return nullptr;
 }
 
+Song* AudioPlayer::get_next_song_looped() const {
+    if (playing_song < static_cast<int>(queued_songs.size()) - 1)
+        return queued_songs[playing_song + 1];
+    return queued_songs[0];
+}
 
 bool AudioPlayer::is_playing() {
     bool ret = false;
@@ -269,6 +300,7 @@ AudioBus* AudioPlayer::get_bus(int bus_id) {
 }
 
 std::vector<std::pair<float, float>> AudioPlayer::get_bus_levels() {
+    //std::lock_guard<std::mutex> lock(mtx);
     std::vector<std::pair<float, float>> ret;
     
     ret.reserve(busses.size());
@@ -279,3 +311,44 @@ std::vector<std::pair<float, float>> AudioPlayer::get_bus_levels() {
     return ret;
 }
 
+
+/* SONG PRELOADER */
+
+/*
+void AudioPlayer::stop_preloader() {
+    stop_flag = true;
+
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        bus_buffer.clear();
+    }
+
+    if(worker.joinable())
+        worker.join();
+}
+
+void AudioPlayer::preload_next_song(const Song* next_song, float progress_ratio) {
+    if(busses.empty()) return;
+
+    stop_preloader();
+    stop_flag = false;
+    bus_buffer.reserve(next_song->get_tracks_count());
+    worker = std::thread(&AudioPlayer::threaded_load, this, get_longest_bus_id(), next_song, progress_ratio);
+}
+
+void AudioPlayer::threaded_load(int longest_bus_id, const Song* next_song, float progress_ratio) {
+    while(!stop_flag) {
+        std::pair<double, double> duration_info = get_bus_playback_info(longest_bus_id);
+
+        if((duration_info.first / duration_info.second) >= progress_ratio) {
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                load_song(next_song, false);
+            }
+            return;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+}
+*/

@@ -6,19 +6,19 @@ AudioBus::~AudioBus() {
     free();
 }
 
-bool AudioBus::load(const AudioTrack& new_track) {
+bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
     if (!BASS_SetDevice(new_track.device_id)) {
-        std::cerr << "[AudioBus " << new_track.name << "] unable to set default device (" << new_track.device_id << ") : " << BASS_ErrorGetCode() << "\n";
+        if(verbose) std::cerr << "[AudioBus " << new_track.name << "] unable to set default device (" << new_track.device_id << ") : " << BASS_ErrorGetCode() << "\n";
         
         return false;
     }
 
     free();
 
-    handle = BASS_StreamCreateFile(FALSE, new_track.file_path.c_str(), 0, 0, 0);
+    handle = BASS_StreamCreateFile(FALSE, new_track.file_path.c_str(), 0, 0, BASS_ASYNCFILE);
 
     if (!handle) {
-        std::cerr << "[AudioBus " << new_track.name << "] unable to load file '" << new_track.file_path << "' : " << BASS_ErrorGetCode() << "\n";
+        if(verbose) std::cerr << "[AudioBus " << new_track.name << "] unable to load file '" << new_track.file_path << "' : " << BASS_ErrorGetCode() << "\n";
     
         return false;
     }

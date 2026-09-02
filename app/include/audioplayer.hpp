@@ -1,10 +1,15 @@
 #pragma once
 
+#include <vector>
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+
 #include "audiobus.hpp"
 #include "song.hpp"
 #include "playlist.hpp"
-#include <vector>
-#include <functional>
 
 
 class AudioPlayer {
@@ -42,6 +47,7 @@ public:
     Song* get_queued_song(int song_id) const;
 
     Song* get_next_song() const;
+    Song* get_next_song_looped() const;
 
     int get_longest_bus_id();
     
@@ -55,7 +61,6 @@ private:
     std::vector<AudioBus> busses;
 
     bool paused = false;
-
     bool should_restart = false;
 
     void process_playing();
@@ -66,11 +71,26 @@ private:
     void clear_busses();
     int create_bus();
 
-    bool load_song(Song* new_song);
+    bool load_song(const Song* new_song, bool verbose = true);
 
-    bool load_track(int bus_id, const AudioTrack& track);
+    void swap_buffers();
+
+    bool load_track(AudioBus& bus, const AudioTrack& track, bool verbose = true);
     bool route_channel(int bus_id, int new_device);
-    bool init_device(int device);
+    bool init_device(int device, bool verbose = true);
 
     void set_volume(int bus_id, float vol);
+
+    /* SONG PRELOADER */
+    std::vector<AudioBus> bus_buffer;
+    
+    /*
+    std::thread worker;
+    std::atomic<bool> stop_flag;
+    std::mutex mtx;
+
+    void stop_preloader();
+    void preload_next_song(const Song* next_song, float progress_ratio);
+    void threaded_load(int longest_bus_id, const Song* next_song, float progress_ratio);
+    */
 };

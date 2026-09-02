@@ -17,6 +17,8 @@ public:
 
     void clear();
 
+    Song* create_song(const std::string& path);
+
     void append_new(Song* s);
 
     Song* get_song(const std::string& path);

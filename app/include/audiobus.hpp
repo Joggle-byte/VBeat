@@ -11,7 +11,7 @@ public:
     AudioBus() = default;
     ~AudioBus();
 
-    bool load(const AudioTrack& new_track);
+    bool load(const AudioTrack& new_track, bool verbose = true);
 
     bool route_to_device(int new_device);
 

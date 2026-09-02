@@ -8,6 +8,7 @@
 #include "../include/utils.hpp"
 #include "../include/json.hpp"
 #include "../include/ui_menu.hpp"
+#include "../include/logger.hpp"
 
 
 using json = nlohmann::json;
@@ -19,21 +20,17 @@ App::~App() {
 }
 
 int App::main() {
-    std::cout << END;
-
     std::system("cls");
 
-    std::cout << "VBeat " << VBEAT_VERSION << " - by Emanuele Alfieri\n\n";
-    std::cout << " ===== Startup Log =====\n";
+    Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
+    Logger::get_instance().log("====== Startup Log ======");
 
     if (!load_config_file()) return 1;
 
     song_bank.load_all(song_bank_path);
     load_all_playlists(playlist_bank_path);
 
-    std::cout << "\n";
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    Logger::get_instance().log("=========================\n");
 
     main_loop();
 
@@ -46,7 +43,7 @@ bool App::load_config_file() {
     std::ifstream file(CONFIG_FILE_PATH);
 
     if(!file.is_open()) {
-        std::cerr << ERROR_COL << "[VBeat] unable to load config file at path '" << CONFIG_FILE_PATH << "'. Exiting...\n" << END;
+        Logger::get_instance().log_err("[VBeat] unable to load config file at path '" + std::string(CONFIG_FILE_PATH) + "'. Exiting...");
         return false;
     }
 
@@ -66,7 +63,7 @@ void App::load_all_playlists(const std::string& bank_path) {
         Playlist* playlist = Playlist::create_from_file(p.string());
 
         if(!playlist) {
-            std::cerr << ERROR_COL << "[Playlist Bank] unable to load playlist '" << p.string() << "'\n" << END;
+            Logger::get_instance().log_err("[Playlist Bank] unable to load playlist '" + p.string() + "'");
             return;
         }
         
@@ -74,7 +71,7 @@ void App::load_all_playlists(const std::string& bank_path) {
 
         for(size_t i = 0; i < songs.size(); i++) {
             if(!song_bank.song_exists(songs[i])) {
-                std::cerr << ERROR_COL << "[Playlist Bank] (" << playlist->get_name() << ") " << "song with id " << i << " doesn't exist in song bank\n" << END;
+                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with id " + std::to_string(i) + " doesn't exist in song bank");
                 playlist->remove_song(i);
             }
         }
@@ -82,7 +79,7 @@ void App::load_all_playlists(const std::string& bank_path) {
         playlists.push_back(playlist);
     }
 
-    std::cout << "[Playlist Bank] playlist bank loaded succesfully\n";
+    Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
 }
 
 void App::list_playlists() {
@@ -115,7 +112,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "View Log"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -128,11 +125,92 @@ void App::main_loop() {
                 case 1:
                     song_queue_play_screen(song_bank.get_songs());
                     break;
+                case 2:
+                    show_log();
+                    break;
             }
             return true;
         }
         return false;
     });
+}
+
+void App::show_log() {
+    std::vector<std::string> lines = Logger::get_instance().get_log();
+
+    int scroll_offset = 0;
+    const int viewport_height = 16; // altezza visibile dell'area
+
+    auto screen = ui::ScreenInteractive::TerminalOutput();
+
+    auto log_view = ui::Renderer([&] {
+        ui::Elements rendered_lines;
+        int max_offset = std::max(0, (int)lines.size() - viewport_height);
+        scroll_offset = std::clamp(scroll_offset, 0, max_offset);
+
+        for (int i = scroll_offset;
+            i < std::min((int)lines.size(), scroll_offset + viewport_height);
+            i++) {
+            
+            auto col = ui::Color::White;
+            std::string text_str = lines[i];
+
+            if(text_str[0] == '$') {
+                col = ui::Color::Red;
+                text_str = text_str.substr(1);
+            }
+            else if(text_str[0] == '%') {
+                col = ui::Color::Yellow;
+                text_str = text_str.substr(1);
+            }
+            
+            auto t = ui::text(text_str);
+            rendered_lines.push_back(t | ui::color(col));
+        }
+
+        return ui::vbox(rendered_lines) |
+            ui::size(ui::HEIGHT, ui::EQUAL, viewport_height) |
+            ui::border;
+    });
+
+    ui::ButtonOption stile_back;
+    stile_back.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 20);
+ 
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+ 
+        return e | ui::border;
+    };
+
+    auto back_button = ui::Button("< Back", screen.ExitLoopClosure(), stile_back);
+
+    auto layout = ui::Container::Vertical({
+        log_view,
+        back_button,
+    });
+
+    auto component = ui::Renderer(layout, [&] {
+        return ui::vbox({
+            log_view->Render(),
+            ui::separator(),
+            back_button->Render(),
+        });
+    });
+
+    component = ui::CatchEvent(component, [&](ui::Event event) {
+        if (event == ui::Event::ArrowDown || event.mouse().button == ui::Mouse::WheelDown) {
+            scroll_offset++;
+            return true;
+        }
+        if (event == ui::Event::ArrowUp || event.mouse().button == ui::Mouse::WheelUp) {
+            scroll_offset--;
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(component);
 }
 
 void App::playlist_selection() {
@@ -294,3 +372,4 @@ void App::song_play_screen(Song* song) {
 
     screen.Loop(renderer);
 }
+

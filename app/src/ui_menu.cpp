@@ -25,9 +25,6 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
     opzioni.entries = &options;
     opzioni.selected = &selected;
  
-    // Stile custom per ogni voce, in base al suo stato.
-    // state.active  -> è la voce attualmente selezionata
-    // state.focused -> il mouse ci sta sopra (o è raggiunta da tastiera)
     opzioni.entries_option.transform = [](const ui::EntryState& state) {
         ui::Element e = ui::text(state.label) | ui::size(ui::WIDTH, ui::EQUAL, 50);
  
@@ -40,12 +37,6 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
         return e | ui::border;
     };
  
-    // Callback eseguita ogni volta che cambia la selezione
-    // (sia per click del mouse sia per frecce/Invio da tastiera).
-    opzioni.on_change = [&] {
-        // qui puoi reagire al cambio di selezione, es. aggiornare uno stato
-    };
-    
     auto menu = ui::Menu(opzioni);
 
     ui::ButtonOption stile_back;
@@ -60,9 +51,6 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
  
     auto back_button = ui::Button("< Back", back_button_callback, stile_back);
  
-    // --- Combine menu + button into one container ------------------------
-    // Container::Vertical lets Tab/arrow keys and mouse focus move
-    // seamlessly between the menu entries and the button below.
     auto container = ui::Container::Vertical({
         menu,
         back_button,
