@@ -25,8 +25,6 @@ int App::main() {
     Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
     Logger::get_instance().log("====== Startup Log ======");
 
-    main_player.list_devices();
-
     if (!load_config_file()) return 1;
 
     song_bank.load_all(song_bank_path);

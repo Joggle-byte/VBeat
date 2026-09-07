@@ -3,14 +3,18 @@ CXXFLAGS = -std=c++17 -Wall -Iinclude
 LDFLAGS  = -Llib -L. -Wl,-rpath,@executable_path -framework AudioToolbox -framework CoreAudio -framework CoreFoundation
 LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen
 
+# ASan: attiva con "make ASAN=1"
+ifeq ($(ASAN),1)
+    CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer -g -O0
+    LDFLAGS  += -fsanitize=address
+endif
+
 # Directories
 SRC_DIR  = src
 OBJ_DIR  = obj
 TARGET   = vbeat
 
 SRCS     := main.cpp $(wildcard $(SRC_DIR)/*.cpp)
-
-
 OBJS     := $(addprefix $(OBJ_DIR)/, $(notdir $(SRCS:.cpp=.o)))
 
 all: $(TARGET)
@@ -20,7 +24,6 @@ $(TARGET): $(OBJS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-
 
 $(OBJ_DIR)/main.o: main.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

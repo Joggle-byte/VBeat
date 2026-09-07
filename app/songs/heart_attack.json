@@ -3,9 +3,9 @@
     "tracks" : [
         {
             "name" : "main",
-            "path" : "C:/Users/emaal/Downloads/A Really Short Slow Dance Song [YWrcUMTDVno].mp3",
+            "path" : "/Users/emaalf/Desktop/audio/Demi Lovato - Heart Attack (Lyrics).mp3",
             "volume" : 1.0,
-            "device" : "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}"
+            "device" : "AppleHDAEngineOutput:5,0,1,2:0"
         }
     ]
 }
