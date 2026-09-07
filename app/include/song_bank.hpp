@@ -1,6 +1,7 @@
 #pragma once
 
 #include "song.hpp"
+#include "resource_validator.hpp"
 #include <map>
 #include <filesystem>
 
@@ -31,6 +32,5 @@ public:
 
 private:
     std::map<fs::path, Song*> bank;
-
-    bool validate_song(Song* s);
+    ResourceValidator validator;
 };

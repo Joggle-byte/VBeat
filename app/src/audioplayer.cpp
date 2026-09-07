@@ -37,7 +37,7 @@ Song* AudioPlayer::get_queued_song(int song_id) const {
 }
 
 
-bool AudioPlayer::load_song(const Song* new_song, bool verbose) {
+bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     if(!new_song) return false;
 
     if(verbose) Logger::get_instance().log("[AudioPlayer] loading song '" + new_song->get_name() + "'...");
@@ -51,7 +51,7 @@ bool AudioPlayer::load_song(const Song* new_song, bool verbose) {
         bus_buffer.push_back(AudioBus());
 
     for(size_t i = 0; i < bus_buffer.size(); i++) {
-        if (!load_track(bus_buffer[i], tracks[i], verbose)) {
+        if (!bus_buffer[i].load(tracks[i], verbose)) {
             if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to load song '" + new_song->get_name() + "'");
             bus_buffer.clear();
             return false;
@@ -92,16 +92,19 @@ void AudioPlayer::swap_buffers() {
 
 void AudioPlayer::list_devices() {
     BASS_DEVICEINFO info;
-    Logger::get_instance().log("Index | Name                          | State");
+    Logger::get_instance().log("AUDIO DEVICES LIST:");
     Logger::get_instance().log("---------------------------------------------");
     for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
         bool enabled   = (info.flags & BASS_DEVICE_ENABLED) != 0;
         bool isDefault = (info.flags & BASS_DEVICE_DEFAULT) != 0;
- 
-        Logger::get_instance().log(std::to_string(i) + "      | " + info.name
+        
+        if(!info.driver) continue;
+
+        Logger::get_instance().log(std::to_string(i) + "      " + std::string(info.driver) + "      " + info.name + "      "
                   + (enabled ? " [active]" : " [unavailable]")
                   + (isDefault ? " (default)" : ""));
     }
+    Logger::get_instance().log("\n");
 }
 
 void AudioPlayer::list_song_queue() {
@@ -111,19 +114,6 @@ void AudioPlayer::list_song_queue() {
         std::cout << i + 1 << ". " << queued_songs[i]->get_name() << "\n";
     
     std::cout << "\n";
-}
-
-bool AudioPlayer::init_device(int device, bool verbose) {
-    if (!BASS_Init(device, 44100, 0, nullptr, nullptr)) {
-        int err = BASS_ErrorGetCode();
-        if (err == BASS_ERROR_ALREADY) {
-            return true;
-        }
-        if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to initialize device " + std::to_string(device)
-                   + " : " + std::to_string(err));
-        return false;
-    }
-    return true;
 }
 
 int AudioPlayer::create_bus() {
@@ -140,13 +130,7 @@ void AudioPlayer::clear_busses() {
     bus_buffer.clear();
 }
 
-bool AudioPlayer::load_track(AudioBus& bus, const AudioTrack& track, bool verbose) {
-    if (!init_device(track.device_id, verbose)) return false;
-
-    return bus.load(track, verbose);
-}
-
-bool AudioPlayer::route_channel(int bus_id, int new_device) {
+bool AudioPlayer::route_channel(int bus_id, const std::string& new_device) {
     if (!is_valid_bus(bus_id)) return false;
 
     return busses[bus_id].route_to_device(new_device);

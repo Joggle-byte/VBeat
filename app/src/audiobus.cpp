@@ -1,5 +1,40 @@
-#include "../include/audiobus.hpp"
 #include <iostream>
+
+#include "../include/audiobus.hpp"
+#include "../include/logger.hpp"
+
+
+int AudioBus::find_device_by_driver(const std::string& target_driver) {
+    if(target_driver.empty()) return -1;
+
+    BASS_DEVICEINFO info;
+    for (int a = 0; BASS_GetDeviceInfo(a, &info); a++)
+    {
+        if (info.driver && target_driver == info.driver)
+            return a;
+    }
+    return -1; // not found
+}
+
+int AudioBus::init_device(const std::string& id, bool verbose) {
+    int idx = find_device_by_driver(id);
+
+    if(idx == -1) {
+        if(verbose) Logger::get_instance().log_err("[AudioBus] (" + track.name + ") device " + id + " was not found");
+        return -1;
+    }
+
+    if (!BASS_Init(idx, 44100, 0, nullptr, nullptr)) {
+        int err = BASS_ErrorGetCode();
+        if (err == BASS_ERROR_ALREADY) {
+            return idx;
+        }
+        if(verbose) Logger::get_instance().log_err("[AudioBus] (" + track.name + ") unable to initialize device " + id
+                   + " : " + std::to_string(err));
+        return -1;
+    }
+    return idx;
+}
 
 
 AudioBus::~AudioBus() {
@@ -7,8 +42,12 @@ AudioBus::~AudioBus() {
 }
 
 bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
-    if (!BASS_SetDevice(new_track.device_id)) {
-        if(verbose) std::cerr << "[AudioBus " << new_track.name << "] unable to set default device (" << new_track.device_id << ") : " << BASS_ErrorGetCode() << "\n";
+    int device_id = init_device(new_track.device_id, verbose);
+
+    if(device_id == -1) return false;
+
+    if (!BASS_SetDevice(device_id)) {
+        if(verbose) Logger::get_instance().log_err("[AudioBus " + new_track.name + "] unable to set device (" + std::to_string(device_id) + ") : " + std::to_string(BASS_ErrorGetCode()));
         
         return false;
     }
@@ -18,7 +57,7 @@ bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
     handle = BASS_StreamCreateFile(FALSE, new_track.file_path.c_str(), 0, 0, BASS_ASYNCFILE);
 
     if (!handle) {
-        if(verbose) std::cerr << "[AudioBus " << new_track.name << "] unable to load file '" << new_track.file_path << "' : " << BASS_ErrorGetCode() << "\n";
+        if(verbose) Logger::get_instance().log_err("[AudioBus " + new_track.name + "] unable to load file '" + new_track.file_path + "' : " + std::to_string(BASS_ErrorGetCode()));
     
         return false;
     }
@@ -33,16 +72,23 @@ bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
     return true;
 }
 
-bool AudioBus::route_to_device(int new_device) {
+bool AudioBus::route_to_device(const std::string& new_device) {
+    int device_idx = find_device_by_driver(new_device);
+
+    if(device_idx == -1) {
+        Logger::get_instance().log_err("[AudioBus " + track.name + "] device " + new_device + " not found");
+        return false;
+    }
+
     if (!handle) {
-        std::cerr << "[AudioBus " << track.name << "] there is no audio stream to route\n";
+        Logger::get_instance().log_err("[AudioBus " + track.name + "] there is no audio stream to route");
 
         return false;
     }
 
-    if (!BASS_ChannelSetDevice(handle, new_device)) {
-        std::cerr << "[AudioBus " << track.name << "] unable to route bus to device "
-                   << new_device << " : " << BASS_ErrorGetCode() << "\n";
+    if (!BASS_ChannelSetDevice(handle, device_idx)) {
+        Logger::get_instance().log_err("[AudioBus " + track.name + "] unable to route bus to device "
+                   + std::to_string(device_idx) + " : " + std::to_string(BASS_ErrorGetCode()));
         
         return false;
     }

@@ -15,7 +15,7 @@ UIMenu::~UIMenu() {
 }
 
 void UIMenu::select_next() {
-    if(selected < options.size() - 1)
+    if(selected < static_cast<int>(options.size()) - 1)
         selected++;
     else selected = 0;
 }
@@ -26,14 +26,32 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
     opzioni.selected = &selected;
  
     opzioni.entries_option.transform = [](const ui::EntryState& state) {
-        ui::Element e = ui::text(state.label) | ui::size(ui::WIDTH, ui::EQUAL, 50);
+        ui::Color bg_color;
+        ui::Color color = ui::Color::White;
  
-        if (state.focused)
-            e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+        std::string text = state.label;
+
+        if (text[0] == '$') {
+            bg_color = ui::Color::Red;
+            color = ui::Color::White;
+            text = text.substr(1) + " (CORRUPTED)";
+        } else if (text[0] == '%') {
+            bg_color = ui::Color::Yellow;
+            color = ui::Color::White;
+            text = text.substr(1) + " (DEGRADED)";
+        }
+
+        if (state.focused) {
+            bg_color = ui::Color::CornflowerBlue;
+            color = ui::Color::White;
+        }
  
-        if (state.active)
-            e = e | ui::bold | ui::color(ui::Color::GreenLight);
+        if (state.active) {
+            color = ui::Color::GreenLight;
+        }
  
+        ui::Element e = ui::text(text) | ui::size(ui::WIDTH, ui::EQUAL, 50) | ui::color(color) | ui::bgcolor(bg_color);
+
         return e | ui::border;
     };
  
@@ -42,10 +60,10 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
     ui::ButtonOption stile_back;
     stile_back.transform = [](const ui::EntryState& state) {
         ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 20);
- 
-        if (state.focused)
+
+        if(state.focused)
             e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
- 
+
         return e | ui::border;
     };
  
@@ -58,6 +76,9 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
 
  
     auto renderer = ui::Renderer(container, [&] {
+        std::string sel = options[selected];
+        if(sel[0] == '$' || sel[0] == '%') sel = sel.substr(1);
+
         return ui::vbox({
                    ui::text(title) | ui::bold | ui::center,
                    ui::separatorEmpty(),
@@ -66,7 +87,7 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
                    ui::separatorEmpty(),
                    back_button->Render(),
                    ui::separator(),
-                   ui::text("Selected: " + options[selected]) | ui::dim,
+                   ui::text("Selected: " + sel) | ui::dim,
                }) |
                ui::border;
     });

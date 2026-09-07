@@ -32,6 +32,8 @@ int App::main() {
 
     Logger::get_instance().log("=========================\n");
 
+    main_player.list_devices();
+
     main_loop();
 
     std::system("cls");
@@ -237,10 +239,17 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
     main_player.set_queue(queue);
 
     std::vector<std::string> options;
-    options.reserve(queue.size());
 
-    for(const auto s : queue)
-        options.push_back(s->get_name());
+    for(const auto s : queue) {
+        std::string name = s->get_name();
+
+        if(s->get_state() == SongState::DEGRADED)
+           name.insert(0, 1, '%');
+        else if(s->get_state() == SongState::CORRUPTED)
+           name.insert(0, 1, '$'); 
+
+        options.push_back(name);
+    }
 
     UIMenu menu("Songs", options, [&] { 
         menu.get_screen().ExitLoopClosure()();
@@ -253,7 +262,19 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
             std::system("cls");
             song_play_screen(main_player.get_queued_song(menu.get_selected_id()));
             std::system("cls");
-            menu.select_next();
+            
+            int search_depth = main_player.get_queue_size();
+            
+            do {
+                menu.select_next();
+
+                if(search_depth == 0) {
+                    menu.deselect_first();
+                    return false;
+                }
+                search_depth--;
+            }
+            while(main_player.get_queued_song(menu.get_selected_id())->get_state() == SongState::CORRUPTED);
             return true;
         }
         return false;
@@ -269,7 +290,21 @@ void App::song_play_screen(Song* song) {
     
     std::string stato = "Playing";     // "Playing" / "Paused" / "Stopped"
 
-    Song* next_song = main_player.get_next_song();
+    Song* next_song;
+    int playing_song = main_player.get_playing_song();
+    int search_depth = main_player.get_queue_size();
+
+    do {
+        if(playing_song == static_cast<int>(main_player.get_queue_size()) - 1)
+            playing_song = 0;
+        else playing_song++;
+
+        next_song = main_player.get_queued_song(playing_song);
+
+        if(search_depth == 0) break;
+        search_depth--;
+    } while(next_song->get_state() == SongState::CORRUPTED);
+
     std::string prossimo_brano = (next_song) ? next_song->get_name() : "---";
 
     auto on_play = [&] {

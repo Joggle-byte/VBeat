@@ -41,7 +41,7 @@ void SongEditor::set_track_name(int track_id, const std::string& new_name) {
     song->set_track_name(track_id, new_name);
 }
 
-void SongEditor::set_track_device(int track_id, int device) {
+void SongEditor::set_track_device(int track_id, const std::string& device) {
     song->set_track_device(track_id, device);
 }
 

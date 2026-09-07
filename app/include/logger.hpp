@@ -13,10 +13,10 @@ public:
         return instance;
     }
 
-    void log(const std::string& line) { buffer.push_back(line); }
-    void log_err(const std::string& line) { buffer.push_back("$" + line); }
-    void log_warn(const std::string& line) { buffer.push_back("%" + line); }
-    void clear() { buffer.clear(); }
+    void log(const std::string& line);
+    void log_err(const std::string& line);
+    void log_warn(const std::string& line);
+    void clear();
 
     std::vector<std::string> get_log() const { return buffer; }
 

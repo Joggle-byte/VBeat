@@ -45,9 +45,10 @@ public:
     AudioBus* get_bus(int bus_id);
 
     Song* get_queued_song(int song_id) const;
-
+    int get_playing_song() const { return playing_song; }
     Song* get_next_song() const;
     Song* get_next_song_looped() const;
+    size_t get_queue_size() const { return queued_songs.size(); }
 
     int get_longest_bus_id();
     
@@ -71,13 +72,11 @@ private:
     void clear_busses();
     int create_bus();
 
-    bool load_song(const Song* new_song, bool verbose = true);
+    bool load_song(Song* new_song, bool verbose = true);
 
     void swap_buffers();
 
-    bool load_track(AudioBus& bus, const AudioTrack& track, bool verbose = true);
-    bool route_channel(int bus_id, int new_device);
-    bool init_device(int device, bool verbose = true);
+    bool route_channel(int bus_id, const std::string& new_device);
 
     void set_volume(int bus_id, float vol);
 

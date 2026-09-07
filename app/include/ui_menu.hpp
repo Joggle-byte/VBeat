@@ -17,6 +17,7 @@ public:
     int get_selected_id() const { return selected; }
 
     void select_next();
+    void deselect_first() { selected = 0; }
 
     ftxui::ScreenInteractive& get_screen() { return screen; }
 

@@ -1,24 +1,13 @@
 #include "../include/song_bank.hpp"
-
 #include "../include/json.hpp"
 #include "../include/bass.h"
 #include "../include/utils.hpp"
 #include "../include/logger.hpp"
+#include "../include/audiobus.hpp"
+
 #include <fstream>
 #include <filesystem>
 #include <iostream>
-
-
-bool is_device_available(int deviceIndex) {
-    if(deviceIndex < 0) return false;
-
-    BASS_DEVICEINFO info;
-    if (!BASS_GetDeviceInfo(static_cast<DWORD>(deviceIndex), &info)) {
-        return false;
-    }
-
-    return (info.flags & BASS_DEVICE_ENABLED) != 0;
-}
 
 
 SongBank::~SongBank() {
@@ -31,47 +20,15 @@ void SongBank::load_all(const std::string& bank_path) {
     for(const auto& p : all) {
         Song* s = Song::create_from_file(p.string());
 
-        if(!s)
+        if(!s) {
             Logger::get_instance().log(std::string(ERROR_COL) + "[Song Bank] unable to load song '" + p.string() + "'" + std::string(END));
-        else if(validate_song(s)) bank[p] = s;
-    }
-
-    Logger::get_instance().log("[Song Bank] song bank loaded succesfully");
-}
-
-bool SongBank::validate_song(Song* s) {
-    std::vector<AudioTrack> corrputed_tracks;
-    std::vector<int> unavailable_devices;
-
-    bool flag = true;
-
-    for(const auto& t : s->get_tracks()) {
-        if(!fs::exists(fs::path(t.file_path))) {
-            corrputed_tracks.push_back(t);
-            flag = false;
+            return;
         }
         
-        if(!is_device_available(t.device_id)) {
-            unavailable_devices.push_back(t.device_id);
-            flag = false;
-        }
+        validator.validate(s);
+        bank[p] = s;
     }
-
-    if(!corrputed_tracks.empty()) {
-        Logger::get_instance().log_err("[Song Bank] cannot resolve tracks of song '" + s->get_name() + "' :");
-        for(const auto& p : corrputed_tracks)
-            Logger::get_instance().log_err("\t> Track '" + p.name + "' (" + p.file_path + ")");
-    }
-
-    if(!unavailable_devices.empty()) {
-        Logger::get_instance().log_warn("[Song Bank] Unavailable audio devices found in song '" + s->get_name() + "' :");
-        for(const auto i : unavailable_devices)
-            Logger::get_instance().log_warn("\t> Device " + std::to_string(i));
-    }
-    
-    return flag;
 }
-
 
 void SongBank::clear() {
     for(const auto& i : bank)
