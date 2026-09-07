@@ -5,13 +5,13 @@
             "name" : "sequenza",
             "path" : "/Users/emaalf/Desktop/audio/Mad_world_sequenza.wav",
             "volume" : 1.0,
-            "device" : 1
+            "device" : "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}"
         },
         {
             "name" : "click",
             "path" : "/Users/emaalf/Desktop/audio/Mad_World_click.wav",
             "volume" : 1.0,
-            "device" : 1
+            "device" : "{0.0.0.00000000}.{77bb5400-77e3-4136-9165-0c13f5ef58ba}"
         }
     ]
 }

@@ -8,6 +8,7 @@
 #include "../include/utils.hpp"
 #include "../include/json.hpp"
 #include "../include/ui_menu.hpp"
+#include "../include/logger.hpp"
 
 
 using json = nlohmann::json;
@@ -19,12 +20,10 @@ App::~App() {
 }
 
 int App::main() {
-    std::cout << END;
-
     std::system("clear && printf '\e[3J'");
 
-    std::cout << "VBeat " << VBEAT_VERSION << " - by Emanuele Alfieri\n\n";
-    std::cout << " ===== Startup Log =====\n";
+    Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
+    Logger::get_instance().log("====== Startup Log ======");
 
     main_player.list_devices();
 
@@ -33,9 +32,9 @@ int App::main() {
     song_bank.load_all(song_bank_path);
     load_all_playlists(playlist_bank_path);
 
-    std::cout << "\n";
+    Logger::get_instance().log("=========================\n");
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    main_player.list_devices();
 
     main_loop();
 
@@ -48,7 +47,7 @@ bool App::load_config_file() {
     std::ifstream file(CONFIG_FILE_PATH);
 
     if(!file.is_open()) {
-        std::cerr << ERROR_COL << "[VBeat] unable to load config file at path '" << CONFIG_FILE_PATH << "'. Exiting...\n" << END;
+        Logger::get_instance().log_err("[VBeat] unable to load config file at path '" + std::string(CONFIG_FILE_PATH) + "'. Exiting...");
         return false;
     }
 
@@ -68,7 +67,7 @@ void App::load_all_playlists(const std::string& bank_path) {
         Playlist* playlist = Playlist::create_from_file(p.string());
 
         if(!playlist) {
-            std::cerr << ERROR_COL << "[Playlist Bank] unable to load playlist '" << p.string() << "'\n" << END;
+            Logger::get_instance().log_err("[Playlist Bank] unable to load playlist '" + p.string() + "'");
             return;
         }
         
@@ -76,7 +75,7 @@ void App::load_all_playlists(const std::string& bank_path) {
 
         for(size_t i = 0; i < songs.size(); i++) {
             if(!song_bank.song_exists(songs[i])) {
-                std::cerr << ERROR_COL << "[Playlist Bank] (" << playlist->get_name() << ") " << "song with id " << i << " doesn't exist in song bank\n" << END;
+                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with id " + std::to_string(i) + " doesn't exist in song bank");
                 playlist->remove_song(i);
             }
         }
@@ -84,7 +83,7 @@ void App::load_all_playlists(const std::string& bank_path) {
         playlists.push_back(playlist);
     }
 
-    std::cout << "[Playlist Bank] playlist bank loaded succesfully\n";
+    Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
 }
 
 void App::list_playlists() {
@@ -117,7 +116,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "View Log"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -130,11 +129,92 @@ void App::main_loop() {
                 case 1:
                     song_queue_play_screen(song_bank.get_songs());
                     break;
+                case 2:
+                    show_log();
+                    break;
             }
             return true;
         }
         return false;
     });
+}
+
+void App::show_log() {
+    std::vector<std::string> lines = Logger::get_instance().get_log();
+
+    int scroll_offset = 0;
+    const int viewport_height = 16; // altezza visibile dell'area
+
+    auto screen = ui::ScreenInteractive::TerminalOutput();
+
+    auto log_view = ui::Renderer([&] {
+        ui::Elements rendered_lines;
+        int max_offset = std::max(0, (int)lines.size() - viewport_height);
+        scroll_offset = std::clamp(scroll_offset, 0, max_offset);
+
+        for (int i = scroll_offset;
+            i < std::min((int)lines.size(), scroll_offset + viewport_height);
+            i++) {
+            
+            auto col = ui::Color::White;
+            std::string text_str = lines[i];
+
+            if(text_str[0] == '$') {
+                col = ui::Color::Red;
+                text_str = text_str.substr(1);
+            }
+            else if(text_str[0] == '%') {
+                col = ui::Color::Yellow;
+                text_str = text_str.substr(1);
+            }
+            
+            auto t = ui::text(text_str);
+            rendered_lines.push_back(t | ui::color(col));
+        }
+
+        return ui::vbox(rendered_lines) |
+            ui::size(ui::HEIGHT, ui::EQUAL, viewport_height) |
+            ui::border;
+    });
+
+    ui::ButtonOption stile_back;
+    stile_back.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 20);
+ 
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+ 
+        return e | ui::border;
+    };
+
+    auto back_button = ui::Button("< Back", screen.ExitLoopClosure(), stile_back);
+
+    auto layout = ui::Container::Vertical({
+        log_view,
+        back_button,
+    });
+
+    auto component = ui::Renderer(layout, [&] {
+        return ui::vbox({
+            log_view->Render(),
+            ui::separator(),
+            back_button->Render(),
+        });
+    });
+
+    component = ui::CatchEvent(component, [&](ui::Event event) {
+        if (event == ui::Event::ArrowDown || event.mouse().button == ui::Mouse::WheelDown) {
+            scroll_offset++;
+            return true;
+        }
+        if (event == ui::Event::ArrowUp || event.mouse().button == ui::Mouse::WheelUp) {
+            scroll_offset--;
+            return true;
+        }
+        return false;
+    });
+
+    screen.Loop(component);
 }
 
 void App::playlist_selection() {
@@ -161,10 +241,17 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
     main_player.set_queue(queue);
 
     std::vector<std::string> options;
-    options.reserve(queue.size());
 
-    for(const auto s : queue)
-        options.push_back(s->get_name());
+    for(const auto s : queue) {
+        std::string name = s->get_name();
+
+        if(s->get_state() == SongState::DEGRADED)
+           name.insert(0, 1, '%');
+        else if(s->get_state() == SongState::CORRUPTED)
+           name.insert(0, 1, '$'); 
+
+        options.push_back(name);
+    }
 
     UIMenu menu("Songs", options, [&] { 
         menu.get_screen().ExitLoopClosure()();
@@ -177,7 +264,19 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
             std::system("clear && printf '\e[3J'");
             song_play_screen(main_player.get_queued_song(menu.get_selected_id()));
             std::system("clear && printf '\e[3J'");
-            menu.select_next();
+            
+            int search_depth = main_player.get_queue_size();
+            
+            do {
+                menu.select_next();
+
+                if(search_depth == 0) {
+                    menu.deselect_first();
+                    return false;
+                }
+                search_depth--;
+            }
+            while(main_player.get_queued_song(menu.get_selected_id())->get_state() == SongState::CORRUPTED);
             return true;
         }
         return false;
@@ -193,7 +292,21 @@ void App::song_play_screen(Song* song) {
     
     std::string stato = "Playing";     // "Playing" / "Paused" / "Stopped"
 
-    Song* next_song = main_player.get_next_song();
+    Song* next_song;
+    int playing_song = main_player.get_playing_song();
+    int search_depth = main_player.get_queue_size();
+
+    do {
+        if(playing_song == static_cast<int>(main_player.get_queue_size()) - 1)
+            playing_song = 0;
+        else playing_song++;
+
+        next_song = main_player.get_queued_song(playing_song);
+
+        if(search_depth == 0) break;
+        search_depth--;
+    } while(next_song->get_state() == SongState::CORRUPTED);
+
     std::string prossimo_brano = (next_song) ? next_song->get_name() : "---";
 
     auto on_play = [&] {
@@ -296,3 +409,4 @@ void App::song_play_screen(Song* song) {
 
     screen.Loop(renderer);
 }
+

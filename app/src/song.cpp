@@ -44,9 +44,24 @@ void Song::set_track_name(int track_id, const std::string& new_name) {
         tracks[track_id].name = new_name;
 }
 
-void Song::set_track_device(int track_id, int device) {
+void Song::set_track_device(int track_id, const std::string& device) {
     if (is_valid_track_id(track_id))
         tracks[track_id].device_id = device;
+}
+    
+void Song::set_track_state(int track_id, TrackState state) {
+    if(is_valid_track_id(track_id))
+        tracks[track_id].state = state;
+}
+
+TrackState Song::get_track_state(int track_id) const {
+    if(is_valid_track_id(track_id))
+        return tracks[track_id].state;
+}
+
+const AudioTrack& Song::get_track(int track_id) {
+    if(is_valid_track_id(track_id))
+        return tracks[track_id];
 }
 
 bool Song::is_valid_track_id(int track_id) const {
@@ -71,7 +86,7 @@ Song* Song::create_from_file(const std::string& path) {
             track["name"],
             track["path"],
             track["volume"],
-            static_cast<int>(track["device"])
+            track["device"]
         });
     }
 
@@ -105,4 +120,8 @@ bool Song::save_to_file(const std::string& path) {
     file.close();
 
     return true;
+}
+
+const std::string& Song::get_name() const {
+    return name;
 }
