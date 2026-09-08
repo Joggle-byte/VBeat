@@ -1,7 +1,8 @@
-#include "../include/song.hpp"
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+
+#include "../include/song.hpp"
 #include "../include/json.hpp"
 
 using json = nlohmann::json;
@@ -79,15 +80,19 @@ Song* Song::create_from_file(const std::string& path) {
     json data;
     file >> data;
 
-    new_song->name = data["name"];
+    try {
+        new_song->name = data["name"];
 
-    for(const auto& track : data["tracks"]) {
-        new_song->add_track({
-            track["name"],
-            track["path"],
-            track["volume"],
-            track["device"]
-        });
+        for(const auto& track : data["tracks"]) {
+            new_song->add_track({
+                track["name"],
+                track["path"],
+                track["volume"],
+                track["device"]
+            });
+        }
+    } catch(...) {
+        return nullptr;
     }
 
     return new_song;

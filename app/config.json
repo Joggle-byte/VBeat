@@ -1,4 +1,5 @@
 {
     "song_bank_path" : "/Users/emaalf/Documents/repos/VBeat/app/songs",
-    "playlist_bank_path" : "/Users/emaalf/Documents/repos/VBeat/app/playlists"
+    "playlist_bank_path" : "/Users/emaalf/Documents/repos/VBeat/app/playlists",
+    "log_file_dir" : "/Users/emaalf/Documents/repos/VBeat/app/logs"
 }

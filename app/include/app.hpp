@@ -6,7 +6,7 @@
 #include "song_editor.hpp"
 #include "song_bank.hpp"
 
-#define CONFIG_FILE_PATH "/Users/emaalf/Documents/repos/VBeat/app/config.json"
+#define CONFIG_FILE_PATH "./"
 
 namespace ui = ftxui;
 
@@ -39,6 +39,8 @@ private:
     bool load_config_file();
 
     void load_all_playlists(const std::string& bank_path);
+
+    void clear_playlists();
 
     void list_playlists();
 

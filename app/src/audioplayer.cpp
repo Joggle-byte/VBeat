@@ -50,16 +50,19 @@ bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     for(size_t i = 0; i < tracks.size(); i++)
         bus_buffer.push_back(AudioBus());
 
+    int loaded_tracks = 0;
+    
     for(size_t i = 0; i < bus_buffer.size(); i++) {
         if (!bus_buffer[i].load(tracks[i], verbose)) {
-            if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to load song '" + new_song->get_name() + "'");
-            bus_buffer.clear();
-            return false;
-        } else if(verbose) Logger::get_instance().log("[AudioPlayer] track '" + tracks[i].name + "' loaded succesfully");
+            if(verbose) Logger::get_instance().log_err("[AudioPlayer] unable to load track '" + tracks[i].name + "'");
+            continue;
+        } else {
+            if(verbose) Logger::get_instance().log("[AudioPlayer] track '" + tracks[i].name + "' loaded succesfully");
+            loaded_tracks++;
+        }
     }
 
-    if(verbose) Logger::get_instance().log("[AudioPlayer] song '" + new_song->get_name() + "' loaded succesfully");
-    return true;
+    return loaded_tracks > 0;
 }
 
 bool AudioPlayer::load_playlist(Playlist* playlist) {
