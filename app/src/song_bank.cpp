@@ -28,10 +28,12 @@ void SongBank::load_all(const std::string& bank_path) {
         validator.validate(s);
         bank[p] = s;
     }
+
+    if(bank.empty()) Logger::get_instance().log_warn("[Song Bank] song bank is empty!");
 }
 
 void SongBank::clear() {
-    for(const auto& i : bank)
+    for(const auto i : bank)
         delete i.second;
     
     bank.clear();

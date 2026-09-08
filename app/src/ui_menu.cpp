@@ -28,6 +28,7 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
     opzioni.entries_option.transform = [](const ui::EntryState& state) {
         ui::Color bg_color;
         ui::Color color = ui::Color::White;
+        bool bold = false;
  
         std::string text = state.label;
 
@@ -44,13 +45,16 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
         if (state.focused) {
             bg_color = ui::Color::CornflowerBlue;
             color = ui::Color::White;
+            bold = true;
         }
  
         if (state.active) {
             color = ui::Color::GreenLight;
+            bold = true;
         }
  
         ui::Element e = ui::text(text) | ui::size(ui::WIDTH, ui::EQUAL, 50) | ui::color(color) | ui::bgcolor(bg_color);
+        if(bold) e |= ui::bold;
 
         return e | ui::border;
     };

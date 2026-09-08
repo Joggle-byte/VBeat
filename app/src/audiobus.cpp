@@ -42,13 +42,15 @@ AudioBus::~AudioBus() {
 }
 
 bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
+    this->track = new_track;
+
     int device_id = init_device(new_track.device_id, verbose);
 
     if(device_id == -1) return false;
 
     if (!BASS_SetDevice(device_id)) {
         if(verbose) Logger::get_instance().log_err("[AudioBus " + new_track.name + "] unable to set device (" + std::to_string(device_id) + ") : " + std::to_string(BASS_ErrorGetCode()));
-        
+        handle = 0;
         return false;
     }
 
@@ -61,11 +63,6 @@ bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
     
         return false;
     }
-
-    this->track.device_id = new_track.device_id;
-    this->track.file_path = new_track.file_path;
-    this->track.name = new_track.name;
-    this->track.volume = new_track.volume;
 
     set_volume(new_track.volume);
     

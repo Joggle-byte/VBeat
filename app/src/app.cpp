@@ -38,22 +38,28 @@ int App::main() {
 
     std::system("cls");
 
-    return 0;
+    return Logger::get_instance().write_to_file();
 }
 
 bool App::load_config_file() {
-    std::ifstream file(CONFIG_FILE_PATH);
+    std::ifstream file(std::string(CONFIG_FILE_PATH) + "config.json");
 
     if(!file.is_open()) {
-        Logger::get_instance().log_err("[VBeat] unable to load config file at path '" + std::string(CONFIG_FILE_PATH) + "'. Exiting...");
+        std::cout << "[VBeat] unable to load config file. Exiting...";
         return false;
     }
 
     json config;
     file >> config;
 
-    song_bank_path = config["song_bank_path"];
-    playlist_bank_path = config["playlist_bank_path"];
+    try {
+        song_bank_path = config["song_bank_path"];
+        playlist_bank_path = config["playlist_bank_path"];
+        Logger::get_instance().set_log_file_dir(config["log_file_dir"]);
+    } catch(...) {
+        Logger::get_instance().log_err("[VBeat] unable to parse config file. Exiting...");
+        return false;
+    }
 
     return true;
 }
@@ -81,8 +87,19 @@ void App::load_all_playlists(const std::string& bank_path) {
         playlists.push_back(playlist);
     }
 
-    Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
+    if(playlists.empty())
+        Logger::get_instance().log_warn("[Playlist Bank] playlist bank is empty!");
+    else
+        Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
 }
+
+void App::clear_playlists() {
+    for(const auto i : playlists)
+        delete i;
+    
+    playlists.clear();
+}
+
 
 void App::list_playlists() {
     std::cout << "\n========== PLAYLISTS ==========\n";
@@ -114,7 +131,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "View Log"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "View Log", "Reload Songs & Playlists"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -129,6 +146,13 @@ void App::main_loop() {
                     break;
                 case 2:
                     show_log();
+                    break;
+                case 3:
+                    Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
+                    clear_playlists();
+                    song_bank.clear();
+                    song_bank.load_all(song_bank_path);
+                    load_all_playlists(playlist_bank_path);
                     break;
             }
             return true;
@@ -236,6 +260,8 @@ void App::playlist_selection() {
 }
 
 void App::song_queue_play_screen(const std::vector<Song*> queue) {
+    if(queue.empty()) return;
+    
     main_player.set_queue(queue);
 
     std::vector<std::string> options;
@@ -305,7 +331,16 @@ void App::song_play_screen(Song* song) {
         search_depth--;
     } while(next_song->get_state() == SongState::CORRUPTED);
 
-    std::string prossimo_brano = (next_song) ? next_song->get_name() : "---";
+    std::string prossimo_brano = "---";
+
+    if(next_song) {
+        prossimo_brano = next_song->get_name();
+
+        if(next_song->get_state() == SongState::DEGRADED)
+            prossimo_brano += " (DEGRADED)";
+        else if(next_song->get_state() == SongState::CORRUPTED)
+            prossimo_brano += " (CORRUPTED)";
+    }
 
     auto on_play = [&] {
         stato = "Playing";

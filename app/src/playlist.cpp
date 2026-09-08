@@ -1,6 +1,8 @@
-#include "../include/playlist.hpp"
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
+
+#include "../include/playlist.hpp"
 #include "../include/json.hpp"
 
 using json = nlohmann::json;
@@ -30,10 +32,14 @@ Playlist* Playlist::create_from_file(const std::string& path) {
     json data;
     file >> data;
 
-    new_playlist->name = data["name"];
-    
-    for(const auto& path : data["songs"]) {
-        new_playlist->add_song(path);
+    try {
+        new_playlist->name = data["name"];
+        
+        for(const auto& path : data["songs"]) {
+            new_playlist->add_song(path);
+        }
+    } catch(...) {
+        return nullptr;
     }
 
     return new_playlist;
