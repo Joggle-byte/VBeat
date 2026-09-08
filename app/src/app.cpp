@@ -41,8 +41,45 @@ int App::main() {
     return Logger::get_instance().write_to_file();
 }
 
+fs::path getAppSupportDir(const std::string& appName) {
+    const char* home = std::getenv("HOME");
+    if (!home) {
+        throw std::runtime_error("Cannot resolve HOME");
+    }
+    fs::path path = fs::path(home) 
+                                  / "Library" / "Application Support" / appName;
+    return path;
+}
+
+std::string make_default_config_file(fs::path dir) {
+    std::string p = "{\n\t\"song_bank_path\" : \"" + (dir / "songs").string() + std::string("\",\n\t")
+        + "\"playlist_bank_path\" : \"" + (dir / "playlists").string() + std::string("\",\n\t")
+        + "\"log_file_dir\" : \"" + (dir / "logs").string() + std::string("\"\n}");
+    
+    return p;
+}
+
 bool App::load_config_file() {
-    std::ifstream file(std::string(CONFIG_FILE_PATH) + "config.json");
+    fs::path dir = getAppSupportDir(APP_NAME);
+
+    fs::create_directories(dir);
+    fs::create_directories(dir / "songs");
+    fs::create_directories(dir / "playlists");
+    fs::create_directories(dir / "logs");
+
+    if(!fs::exists(dir / "config.json")) {
+        std::ofstream new_file(dir/"config.json");
+
+        if(!new_file.is_open()) {
+            std::cout << "[VBeat] unable to create config file. Exiting...";
+            return false;
+        }
+
+        new_file << make_default_config_file(dir);
+        new_file.close();
+    }
+
+    std::ifstream file(dir / "config.json");
 
     if(!file.is_open()) {
         std::cout << "[VBeat] unable to load config file. Exiting...";
@@ -50,9 +87,9 @@ bool App::load_config_file() {
     }
 
     json config;
-    file >> config;
 
     try {
+        file >> config;
         song_bank_path = config["song_bank_path"];
         playlist_bank_path = config["playlist_bank_path"];
         Logger::get_instance().set_log_file_dir(config["log_file_dir"]);
@@ -240,6 +277,8 @@ void App::show_log() {
 }
 
 void App::playlist_selection() {
+    if(playlists.empty()) return;
+
     std::vector<std::string> options;
     options.reserve(playlists.size());
 

@@ -33,7 +33,7 @@ void SongBank::load_all(const std::string& bank_path) {
 }
 
 void SongBank::clear() {
-    for(const auto i : bank)
+    for(const auto& i : bank)
         delete i.second;
     
     bank.clear();

@@ -6,8 +6,6 @@
 #include "song_editor.hpp"
 #include "song_bank.hpp"
 
-#define CONFIG_FILE_PATH "./"
-
 namespace ui = ftxui;
 
 

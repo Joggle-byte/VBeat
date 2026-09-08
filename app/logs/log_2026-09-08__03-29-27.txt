@@ -1,0 +1,50 @@
+(3:26) VBeat 0.0.1 - by Emanuele Alfieri
+
+(3:26) ====== Startup Log ======
+(3:26) [Playlist Bank] playlist bank loaded succesfully
+(3:26) =========================
+
+(3:26) AUDIO DEVICES LIST:
+(3:26) ---------------------------------------------
+(3:26) 2      AppleHDAEngineOutput:5,0,1,2:0      Built-in Output       [active] (default)
+(3:26) 
+
+(3:26) [AudioPlayer] loading song 'Heart Attack - Demi Lovato'...
+(3:26) [AudioPlayer] track 'main' loaded succesfully
+(3:26) [AudioPlayer] now playing 'Heart Attack - Demi Lovato'
+
+(3:26) [AudioPlayer] loading song 'Mad World'...
+(3:26) [AudioPlayer] track 'sequenza' loaded succesfully
+(3:26) [AudioPlayer] track 'click' loaded succesfully
+(3:26) [AudioPlayer] now playing 'Mad World'
+
+(3:27) [AudioPlayer] loading song 'Have a nice day - Bon Jovi'...
+(3:27) [AudioPlayer] track 'main' loaded succesfully
+(3:27) [AudioPlayer] now playing 'Have a nice day - Bon Jovi'
+
+(3:27) [AudioPlayer] loading song 'Heart Attack - Demi Lovato'...
+(3:27) [AudioPlayer] track 'main' loaded succesfully
+(3:27) [AudioPlayer] now playing 'Heart Attack - Demi Lovato'
+
+(3:27) >>> RELOADING SONGS & PLAYLISTS...
+(3:27) [Playlist Bank] playlist bank loaded succesfully
+(3:27) >>> RELOADING SONGS & PLAYLISTS...
+(3:27) [Playlist Bank] playlist bank loaded succesfully
+(3:28) >>> RELOADING SONGS & PLAYLISTS...
+%(3:28) [SongValidator] (in song: Have a nice day - Bon Jovi) Track 'main' is routed to an unavailable device: AppleHDAEnginreOutput:5,0,1,2:0
+$(3:28) [SongValidator] song 'Have a nice day - Bon Jovi' is corrupted
+(3:28) [Playlist Bank] playlist bank loaded succesfully
+(3:28) [AudioPlayer] loading song 'Have a nice day - Bon Jovi'...
+$(3:28) [AudioBus] (main) device AppleHDAEnginreOutput:5,0,1,2:0 was not found
+$(3:28) [AudioPlayer] unable to load track 'main'
+(3:28) [AudioPlayer] loading song 'Heart Attack - Demi Lovato'...
+(3:28) [AudioPlayer] track 'main' loaded succesfully
+(3:28) [AudioPlayer] now playing 'Heart Attack - Demi Lovato'
+
+(3:28) [AudioPlayer] loading song 'Mad World'...
+(3:28) [AudioPlayer] track 'sequenza' loaded succesfully
+(3:28) [AudioPlayer] track 'click' loaded succesfully
+(3:28) [AudioPlayer] now playing 'Mad World'
+
+(3:28) >>> RELOADING SONGS & PLAYLISTS...
+(3:28) [Playlist Bank] playlist bank loaded succesfully

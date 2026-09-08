@@ -9,7 +9,7 @@
         },
         {
             "name" : "click",
-            "path" : "/Users/emaalif/Desktop/audio/Mad_World_click.wav",
+            "path" : "/Users/emaalf/Desktop/audio/Mad_World_click.wav",
             "volume" : 1.0,
             "device" : "AppleHDAEngineOutput:5,0,1,2:0"
         }

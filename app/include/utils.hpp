@@ -4,6 +4,7 @@
 #include <string>
 #include <cmath>
 
+#define APP_NAME "VBeat"
 #define VBEAT_VERSION "0.0.1"
 
 #define ERROR_COL "\033[31m"
