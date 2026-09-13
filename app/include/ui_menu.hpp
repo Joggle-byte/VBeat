@@ -16,6 +16,7 @@ public:
 
     int get_selected_id() const { return selected; }
 
+    void set_selected(int sel);
     void select_next();
     void deselect_first() { selected = 0; }
 

@@ -36,6 +36,9 @@ public:
     SongState get_state() const { return state; }
     TrackState get_track_state(int track_id) const;
 
+    bool is_corrupted() const { return state == SongState::CORRUPTED; }
+    bool is_degraded() const { return state == SongState::DEGRADED; }
+
     size_t get_tracks_count() const { return tracks.size(); }
 
     static Song* create_from_file(const std::string& path);

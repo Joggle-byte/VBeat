@@ -53,6 +53,9 @@ private:
     void show_log();
 
     void playlist_selection();
+
+    void song_creation();
+
     void song_selection();
 
     void song_queue_play_screen(const std::vector<Song*> queue);

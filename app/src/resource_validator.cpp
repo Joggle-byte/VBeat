@@ -32,32 +32,32 @@ void ResourceValidator::validate(Song* res) {
         }
 
         if(!fs::exists(fs::path(t.file_path))) {
-                res->set_track_state(i, TrackState::FILE_MISSING);
+            res->set_track_state(i, TrackState::FILE_MISSING);
         } else res->set_track_state(i, TrackState::OK);
     }
 
     bool corrupted_flag = true;
+    bool degraded_flag = false;
 
     for(size_t i = 0; i < res->get_tracks_count(); i++) {
         const AudioTrack& t = res->get_track(i);
 
         switch(res->get_track_state(i)) {
             case TrackState::OK:
-                res->set_state(SongState::OK);
                 corrupted_flag = false;
                 break;
             case TrackState::DEVICE_MISSING:
-                res->set_state(SongState::DEGRADED);
+                degraded_flag = true;
                 Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' is routed to an unavailable device: " + t.device_id);
                 break;
             case TrackState::FILE_MISSING:
-                res->set_state(SongState::DEGRADED);
+                degraded_flag = true;
                 Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' points to an unavailable audio file: " + t.file_path);
                 break;
             case TrackState::FILE_AND_DEVICE_MISSING:
+                degraded_flag = true;
                 Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' is routed to an unavailable device: " + t.device_id);
                 Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' points to an unavailable audio file: " + t.file_path);
-                res->set_state(SongState::DEGRADED);
                 break;
         }
     }
@@ -65,6 +65,12 @@ void ResourceValidator::validate(Song* res) {
     if(corrupted_flag) {
         res->set_state(SongState::CORRUPTED);
         Logger::get_instance().log_err("[SongValidator] song '" + res->get_name() + "' is corrupted");
+        return;
+    }
+
+    if(degraded_flag) {
+        res->set_state(SongState::DEGRADED);
+        Logger::get_instance().log_err("[SongValidator] song '" + res->get_name() + "' is degraded");
     }
 }
 

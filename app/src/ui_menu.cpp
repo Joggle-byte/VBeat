@@ -14,6 +14,11 @@ UIMenu::~UIMenu() {
     options.clear();
 }
 
+
+void UIMenu::set_selected(int sel) {
+    if(sel >= 0 && sel < static_cast<int>(options.size())) selected = sel;
+}
+
 void UIMenu::select_next() {
     if(selected < static_cast<int>(options.size()) - 1)
         selected++;
@@ -45,7 +50,6 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
         if (state.focused) {
             bg_color = ui::Color::CornflowerBlue;
             color = ui::Color::White;
-            bold = true;
         }
  
         if (state.active) {
