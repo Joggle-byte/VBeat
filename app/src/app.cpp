@@ -4,6 +4,9 @@
 #include <thread>
 #include <chrono>
 
+//TEMP
+#include <list>
+
 #include "../include/app.hpp"
 #include "../include/utils.hpp"
 #include "../include/json.hpp"
@@ -168,7 +171,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "View Log", "Reload Songs & Playlists"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "✎ Edit Song", "🗎 View Log", "🗘 Reload Songs & Playlists"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -182,9 +185,15 @@ void App::main_loop() {
                     song_queue_play_screen(song_bank.get_songs());
                     break;
                 case 2:
-                    show_log();
+                    song_creation();
                     break;
                 case 3:
+                    song_editing();
+                    break;
+                case 4:
+                    show_log();
+                    break;
+                case 5:
                     Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
                     clear_playlists();
                     song_bank.clear();
@@ -202,7 +211,7 @@ void App::show_log() {
     std::vector<std::string> lines = Logger::get_instance().get_log();
 
     int scroll_offset = 0;
-    const int viewport_height = 16; // altezza visibile dell'area
+    const int viewport_height = 20; // altezza visibile dell'area
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -308,9 +317,9 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
     for(const auto s : queue) {
         std::string name = s->get_name();
 
-        if(s->get_state() == SongState::DEGRADED)
+        if(s->is_degraded())
            name.insert(0, 1, '%');
-        else if(s->get_state() == SongState::CORRUPTED)
+        else if(s->is_corrupted())
            name.insert(0, 1, '$'); 
 
         options.push_back(name);
@@ -320,26 +329,15 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
         menu.get_screen().ExitLoopClosure()();
     });
 
+    if(main_player.get_queued_song(menu.get_selected_id())->is_corrupted()) {
+        menu.set_selected(main_player.select_next_song_looped());
+    }
+
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            std::system("clear && printf '\e[3J'");
             main_player.play(menu.get_selected_id());
-            std::system("clear && printf '\e[3J'");
-            song_play_screen(main_player.get_queued_song(menu.get_selected_id()));
-            std::system("clear && printf '\e[3J'");
-            
-            int search_depth = main_player.get_queue_size();
-            
-            do {
-                menu.select_next();
-
-                if(search_depth == 0) {
-                    menu.deselect_first();
-                    return false;
-                }
-                search_depth--;
-            }
-            while(main_player.get_queued_song(menu.get_selected_id())->get_state() == SongState::CORRUPTED);
+            song_play_screen(main_player.get_current_song());
+            menu.set_selected(main_player.select_next_song_looped());
             return true;
         }
         return false;
@@ -350,25 +348,13 @@ void App::song_play_screen(Song* song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
     std::string titolo_brano = song->get_name();
+
     std::pair<double, double> progresso(0.0f, 0.0f);
     int longest_bus = main_player.get_longest_bus_id();
     
     std::string stato = "Playing";     // "Playing" / "Paused" / "Stopped"
+    Song* next_song = main_player.get_next_song();
 
-    Song* next_song;
-    int playing_song = main_player.get_playing_song();
-    int search_depth = main_player.get_queue_size();
-
-    do {
-        if(playing_song == static_cast<int>(main_player.get_queue_size()) - 1)
-            playing_song = 0;
-        else playing_song++;
-
-        next_song = main_player.get_queued_song(playing_song);
-
-        if(search_depth == 0) break;
-        search_depth--;
-    } while(next_song->get_state() == SongState::CORRUPTED);
 
     std::string prossimo_brano = "---";
 
@@ -407,9 +393,9 @@ void App::song_play_screen(Song* song) {
     ui::ButtonOption opzioni_bottone;
     opzioni_bottone.transform = stile_bottone;
 
-    auto btn_play  = ui::Button("Play",  on_play,  opzioni_bottone);
-    auto btn_pause = ui::Button("Pause", on_pause, opzioni_bottone);
-    auto btn_stop  = ui::Button("Stop",  on_stop,  opzioni_bottone);
+    auto btn_play  = ui::Button("▶",  on_play,  opzioni_bottone);
+    auto btn_pause = ui::Button("⏸", on_pause, opzioni_bottone);
+    auto btn_stop  = ui::Button("◼",  on_stop,  opzioni_bottone);
 
     auto controlli = ui::Container::Horizontal({
         btn_play,
@@ -482,3 +468,246 @@ void App::song_play_screen(Song* song) {
     screen.Loop(renderer);
 }
 
+
+struct UITrack {
+    AudioTrack data;
+    int device_index = 0;
+};
+
+void App::song_creation(Song* edit_song) {
+    auto screen = ui::ScreenInteractive::TerminalOutput();
+ 
+    std::string nome_canzone;
+
+    if(edit_song) nome_canzone = edit_song->get_name();
+ 
+    std::vector<std::string> audio_devices_names = main_player.get_device_names();
+    std::vector<std::string> audio_devices_ids = main_player.get_device_ids();
+ 
+    std::list<UITrack> tracce;
+ 
+    auto container_tracce = ui::Container::Vertical({});
+ 
+    auto crea_ui_traccia = [&](std::list<UITrack>::iterator it) -> ui::Component {
+        UITrack& stato = *it;
+
+        auto input_nome = ui::Input(&stato.data.name, "Track name...");
+
+        ui::SliderOption<float> opzioni_volume;
+        opzioni_volume.value = &stato.data.volume;
+        opzioni_volume.min = 0.0f;
+        opzioni_volume.max = 2.0f;
+        opzioni_volume.increment = 0.05f;
+
+        auto slider_volume = ui::Slider<float>(opzioni_volume);
+
+        auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
+ 
+        
+        stato.device_index = AudioBus::find_device_by_driver(stato.data.device_id);
+
+        auto dropdown_device = ui::Dropdown(&audio_devices_names, &stato.device_index);
+ 
+        //DELETE BUTTON
+        auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
+ 
+        auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &tracce] {
+            if (auto self = self_weak_box->lock())
+                self->Detach();
+            tracce.erase(it);
+        });
+ 
+        
+        auto gruppo = ui::Container::Vertical({
+            input_nome,
+            input_percorso,
+            slider_volume,
+            dropdown_device,
+            btn_elimina
+        });
+
+        ui::Component componente = ui::Renderer(gruppo, [&stato, input_nome, slider_volume,
+                                                   input_percorso, dropdown_device,
+                                                   btn_elimina] {
+            return ui::vbox({
+                       ui::hbox(ui::text("Name:    ") | ui::dim, input_nome->Render()),
+                       ui::hbox(ui::text("Volume:  ") | ui::dim, slider_volume->Render() | ui::flex,
+                            ui::text(" " + std::to_string(stato.data.volume))),
+                       ui::hbox(ui::text("File:    ") | ui::dim, input_percorso->Render()),
+                       ui::hbox(ui::text("Device:  ") | ui::dim, dropdown_device->Render()),
+                       ui::separator(),
+                       btn_elimina->Render(),
+                   }) |
+                   ui::border;
+        });
+ 
+        *self_weak_box = componente;
+        return componente;
+    };
+ 
+    auto on_aggiungi_click = [&] {
+        tracce.emplace_back();
+        auto it = std::prev(tracce.end());
+        container_tracce->Add(crea_ui_traccia(it));
+    };
+ 
+    auto btn_aggiungi = ui::Button("+ Add Track", on_aggiungi_click);
+ 
+    auto input_nome_canzone = ui::Input(&nome_canzone, "Song name...");
+ 
+ 
+    auto on_salva_click = [&] {
+        if(tracce.empty() || nome_canzone.empty()) return;
+        
+        std::string song_path;
+        Song* new_song;
+        
+        if(edit_song) {
+            new_song = edit_song;
+            song_path = song_bank.get_song_path(edit_song);
+
+            edit_song->clear_tracks();
+        } else {
+            song_path = song_bank_path + "/" + nome_canzone + ".json";
+            new_song = song_bank.create_song(song_path);
+        }
+        
+        new_song->set_name(nome_canzone);
+
+        for(auto& t : tracce) {
+            t.data.device_id = audio_devices_ids[t.device_index];
+            new_song->add_track(t.data);
+        }
+            
+        song_bank.validate_song(new_song);
+
+        if(!new_song->save_to_file(song_path))
+            Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
+        else
+            Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
+
+        screen.ExitLoopClosure()();
+    };
+ 
+    auto on_annulla_click = [&] {
+        screen.ExitLoopClosure()();
+    };
+ 
+    ui::ButtonOption stile_salva;
+    stile_salva.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Green) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+ 
+    ui::ButtonOption stile_annulla;
+    stile_annulla.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+ 
+    auto btn_salva = ui::Button("Save and Back", on_salva_click, stile_salva);
+    auto btn_annulla = ui::Button("Cancel", on_annulla_click, stile_annulla);
+ 
+    auto bottoni_finali = ui::Container::Horizontal({
+        btn_salva,
+        btn_annulla,
+    });
+ 
+    auto layout_principale = ui::Container::Vertical({
+        input_nome_canzone,
+        btn_aggiungi,
+        container_tracce,
+        bottoni_finali,
+    });
+    
+    auto get_index_from_device = [&] (const std::string& dev) -> int {
+        for(int i = 0; i < static_cast<int>(audio_devices_ids.size()); i++) {
+            if(audio_devices_ids[i] == dev) return i;
+        }
+        return -1;
+    };
+
+    if(edit_song) {
+        for(auto& t : edit_song->get_tracks()) {
+            on_aggiungi_click();
+            UITrack& new_track = tracce.back();
+            new_track.data = t;
+
+            int idx = get_index_from_device(t.device_id);
+            new_track.device_index = (idx >= 0) ? idx : 0;
+        }
+    }
+
+    auto renderer = ui::Renderer(layout_principale, [&] {
+        return ui::vbox({
+                   ui::text("Create New Song") | ui::bold | ui::center,
+                   ui::separator(),
+ 
+                   ui::hbox(ui::text("Song Name: ") | ui::dim, input_nome_canzone->Render()),
+ 
+                   ui::separator(),
+ 
+                   ui::hbox({
+                       ui::text("Tracks") | ui::bold,
+                       ui::filler(),
+                       btn_aggiungi->Render(),
+                   }),
+                   ui::separator(),
+ 
+                   container_tracce->Render() | ui::vscroll_indicator | ui::frame |
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+ 
+                   ui::separator(),
+                   bottoni_finali->Render() | ui::center,
+               }) |
+               ui::size(ui::WIDTH, ui::GREATER_THAN, 60) |
+               ui::border;
+    });
+ 
+    screen.Loop(renderer);
+}
+
+
+void App::song_editing() {
+    std::vector<Song*> songs = song_bank.get_songs();
+
+    if(songs.empty()) return;
+
+    std::vector<std::string> options;
+
+    auto load_songs = [&] {
+        options.clear();
+
+        for(const auto s : songs) {
+            std::string name = s->get_name();
+
+            if(s->is_degraded())
+                name.insert(0, 1, '%');
+            else if(s->is_corrupted())
+                name.insert(0, 1, '$'); 
+
+            options.push_back(name);
+        }
+    };
+    
+    load_songs();
+
+    UIMenu menu("Choose a song to edit", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            song_creation(songs[menu.get_selected_id()]);
+            load_songs();
+            menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    });
+}

@@ -32,6 +32,10 @@ void SongBank::load_all(const std::string& bank_path) {
     if(bank.empty()) Logger::get_instance().log_warn("[Song Bank] song bank is empty!");
 }
 
+void SongBank::validate_song(Song* song) {
+    validator.validate(song);
+}
+
 void SongBank::clear() {
     for(const auto& i : bank)
         delete i.second;
@@ -44,6 +48,17 @@ Song* SongBank::get_song(const std::string& path) {
     if (it != bank.end()) return it->second;
 
     return nullptr;
+}
+
+std::string SongBank::get_song_path(const Song* song) const {
+    auto it = std::find_if(bank.begin(), bank.end(), 
+        [&song](const auto& pair) {
+            return pair.second == song;
+        });
+
+    if (it != bank.end()) {
+        return it->first.string();
+    } else return "";
 }
 
 std::vector<Song*> SongBank::get_songs() {
@@ -59,6 +74,7 @@ std::vector<Song*> SongBank::get_songs() {
 
 Song* SongBank::create_song(const std::string& path) {
     Song* s = new Song();
+    
     bank[fs::path(path)] = s;
 
     return s;

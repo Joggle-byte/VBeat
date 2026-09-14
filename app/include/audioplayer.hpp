@@ -21,6 +21,10 @@ public:
     void list_devices();
     void list_song_queue();
 
+    std::vector<std::string> get_device_names() const;
+    std::vector<std::string> get_device_ids() const;
+    std::string get_device_id_from_index(int index) const;
+
     void queue_song(Song* song);
     void set_queue(std::vector<Song*> new_queue);
 
@@ -35,6 +39,8 @@ public:
     void pause();
     void stop();
     void resume();
+    int select_next_song();
+    int select_next_song_looped();
 
     bool is_playing();
 
@@ -45,10 +51,13 @@ public:
     AudioBus* get_bus(int bus_id);
 
     Song* get_queued_song(int song_id) const;
+    Song* get_current_song() const;
+    
     int get_playing_song() const { return playing_song; }
     Song* get_next_song() const;
     Song* get_next_song_looped() const;
     size_t get_queue_size() const { return queued_songs.size(); }
+
 
     int get_longest_bus_id();
     

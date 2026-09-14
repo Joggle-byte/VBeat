@@ -20,6 +20,7 @@ public:
 
     int add_track(AudioTrack track);
     bool remove_track(int track_id);
+    void clear_tracks() { tracks.clear(); }
 
     void set_track_volume(int track_id, float vol);
     void set_track_filepath(int track_id, const std::string& path);
@@ -35,6 +36,9 @@ public:
     const std::string& get_name() const;
     SongState get_state() const { return state; }
     TrackState get_track_state(int track_id) const;
+
+    bool is_corrupted() const { return state == SongState::CORRUPTED; }
+    bool is_degraded() const { return state == SongState::DEGRADED; }
 
     size_t get_tracks_count() const { return tracks.size(); }
 

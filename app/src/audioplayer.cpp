@@ -36,6 +36,11 @@ Song* AudioPlayer::get_queued_song(int song_id) const {
     return queued_songs[song_id];
 }
 
+Song* AudioPlayer::get_current_song() const {
+    if(playing_song >= 0 && playing_song < static_cast<int>(get_queue_size())) return queued_songs[playing_song];
+    return nullptr;
+}
+
 
 bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     if(!new_song) return false;
@@ -119,6 +124,40 @@ void AudioPlayer::list_song_queue() {
     std::cout << "\n";
 }
 
+std::vector<std::string> AudioPlayer::get_device_names() const {
+    std::vector<std::string> ret;
+    BASS_DEVICEINFO info;
+    
+    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+        if(!info.driver) continue;
+
+        ret.push_back(std::string(info.name));
+    }
+
+    return ret;
+} 
+
+std::vector<std::string> AudioPlayer::get_device_ids() const {
+    std::vector<std::string> ret;
+    BASS_DEVICEINFO info;
+    
+    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+        if(info.driver) ret.push_back(std::string(info.driver));
+    }
+
+    return ret;
+} 
+
+std::string AudioPlayer::get_device_id_from_index(int index) const {
+    BASS_DEVICEINFO info;
+
+    if(!BASS_GetDeviceInfo(index, &info)) return "";
+    if(!info.driver) return "";
+
+    return std::string(info.driver);
+}
+
+
 int AudioPlayer::create_bus() {
     busses.emplace_back();
     int idx = static_cast<int>(busses.size()) - 1;
@@ -198,6 +237,8 @@ void AudioPlayer::play_queue() {
         if(cmd != 'y') return;
     }
 }
+//
+
 
 void AudioPlayer::pause() {
     paused = true;
@@ -223,20 +264,79 @@ void AudioPlayer::stop() {
     }
 
     //stop_preloader();
-    playing_song = -1;
+    //playing_song = -1;
 }
 
+int AudioPlayer::select_next_song() {
+    int current_song = playing_song;
+    int queue_size = static_cast<int>(get_queue_size());
+    int max_depth = queue_size;
+
+    do {
+        if(current_song == queue_size - 1) {
+            playing_song = current_song;
+            return playing_song;
+        };
+
+        current_song++;
+        max_depth--;
+
+    } while(queued_songs[current_song]->is_corrupted() && max_depth > 0);
+
+    playing_song = current_song;
+    return playing_song;
+}
+
+int AudioPlayer::select_next_song_looped() {
+    int current_song = playing_song;
+    int queue_size = static_cast<int>(get_queue_size());
+    int max_depth = queue_size;
+
+    do {
+        if(current_song == queue_size - 1) {
+            current_song = 0;
+        } else current_song++;
+        max_depth--;
+
+    } while(queued_songs[current_song]->is_corrupted() && max_depth > 0);
+
+    playing_song = current_song;
+    return playing_song;
+}
+
+
 Song* AudioPlayer::get_next_song() const {
-    if (playing_song < static_cast<int>(queued_songs.size()) - 1)
-        return queued_songs[playing_song + 1];
-    return nullptr;
+    int current_song = playing_song;
+    int queue_size = static_cast<int>(get_queue_size());
+    int max_depth = queue_size;
+
+    do {
+        if(current_song == queue_size - 1) return nullptr;
+
+        current_song++;
+        max_depth--;
+
+    } while(queued_songs[current_song]->is_corrupted() && max_depth > 0);
+
+    return queued_songs[current_song];
 }
 
 Song* AudioPlayer::get_next_song_looped() const {
-    if (playing_song < static_cast<int>(queued_songs.size()) - 1)
-        return queued_songs[playing_song + 1];
-    return queued_songs[0];
+    int current_song = playing_song;
+    int queue_size = static_cast<int>(get_queue_size());
+    int max_depth = queue_size;
+
+    do {
+        if(current_song == queue_size - 1) {
+            current_song = 0;
+        } else current_song++;
+        max_depth--;
+
+    } while(queued_songs[current_song]->is_corrupted() && max_depth > 0);
+
+    return queued_songs[current_song];
 }
+
 
 bool AudioPlayer::is_playing() {
     bool ret = false;
