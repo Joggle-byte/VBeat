@@ -54,7 +54,8 @@ private:
 
     void playlist_selection();
 
-    void song_creation();
+    void song_creation(Song* song = nullptr);
+    void song_editing();
 
     void song_selection();
 

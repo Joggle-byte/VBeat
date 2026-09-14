@@ -23,6 +23,7 @@ public:
     void append_new(Song* s);
 
     Song* get_song(const std::string& path);
+    std::string get_song_path(const Song* song) const;
 
     std::vector<Song*> get_songs();
 

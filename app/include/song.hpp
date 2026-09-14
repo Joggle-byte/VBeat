@@ -20,6 +20,7 @@ public:
 
     int add_track(AudioTrack track);
     bool remove_track(int track_id);
+    void clear_tracks() { tracks.clear(); }
 
     void set_track_volume(int track_id, float vol);
     void set_track_filepath(int track_id, const std::string& path);

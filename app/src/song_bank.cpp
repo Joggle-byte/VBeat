@@ -50,6 +50,17 @@ Song* SongBank::get_song(const std::string& path) {
     return nullptr;
 }
 
+std::string SongBank::get_song_path(const Song* song) const {
+    auto it = std::find_if(bank.begin(), bank.end(), 
+        [&song](const auto& pair) {
+            return pair.second == song;
+        });
+
+    if (it != bank.end()) {
+        return it->first.string();
+    } else return "";
+}
+
 std::vector<Song*> SongBank::get_songs() {
     std::vector<Song*> values;
     values.reserve(bank.size());

@@ -134,7 +134,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "Create Song", "View Log", "Reload Songs & Playlists"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "Create Song", "Edit Song", "View Log", "Reload Songs & Playlists"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -151,9 +151,12 @@ void App::main_loop() {
                     song_creation();
                     break;
                 case 3:
-                    show_log();
+                    song_editing();
                     break;
                 case 4:
+                    show_log();
+                    break;
+                case 5:
                     Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
                     clear_playlists();
                     song_bank.clear();
@@ -432,10 +435,12 @@ struct UITrack {
     int device_index = 0;
 };
 
-void App::song_creation() {
+void App::song_creation(Song* edit_song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
  
     std::string nome_canzone;
+
+    if(edit_song) nome_canzone = edit_song->get_name();
  
     std::vector<std::string> audio_devices_names = main_player.get_device_names();
     std::vector<std::string> audio_devices_ids = main_player.get_device_ids();
@@ -460,7 +465,7 @@ void App::song_creation() {
         auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
  
         
-        //stato.device_index = AudioBus::find_device_by_driver(stato.data.device_id);
+        stato.device_index = AudioBus::find_device_by_driver(stato.data.device_id);
 
         auto dropdown_device = ui::Dropdown(&audio_devices_names, &stato.device_index);
  
@@ -514,23 +519,32 @@ void App::song_creation() {
  
     auto on_salva_click = [&] {
         if(tracce.empty() || nome_canzone.empty()) return;
+        
+        std::string song_path;
+        Song* new_song;
+        
+        if(edit_song) {
+            new_song = edit_song;
+            song_path = song_bank.get_song_path(edit_song);
 
-        std::string song_path = song_bank_path + "/" + nome_canzone + ".json";
-        Song* new_song = song_bank.create_song(song_path);
-
+            edit_song->clear_tracks();
+        } else {
+            song_path = song_bank_path + "/" + nome_canzone + ".json";
+            new_song = song_bank.create_song(song_path);
+        }
+        
         new_song->set_name(nome_canzone);
 
         for(auto& t : tracce) {
             t.data.device_id = audio_devices_ids[t.device_index];
             new_song->add_track(t.data);
         }
-        
-        Logger::get_instance().log(">>> Created new song '" + nome_canzone + "'");
+            
+        Logger::get_instance().log(((edit_song) ? ">>> Created new song '" : ">>> Edited new song '") + nome_canzone + "'");
 
         song_bank.validate_song(new_song);
 
         new_song->save_to_file(song_path);
-
         screen.ExitLoopClosure()();
     };
  
@@ -568,7 +582,25 @@ void App::song_creation() {
         container_tracce,
         bottoni_finali,
     });
- 
+    
+    auto get_index_from_device = [&] (const std::string& dev) -> int {
+        for(int i = 0; i < static_cast<int>(audio_devices_ids.size()); i++) {
+            if(audio_devices_ids[i] == dev) return i;
+        }
+        return -1;
+    };
+
+    if(edit_song) {
+        for(auto& t : edit_song->get_tracks()) {
+            on_aggiungi_click();
+            UITrack& new_track = tracce.back();
+            new_track.data = t;
+
+            int idx = get_index_from_device(t.device_id);
+            new_track.device_index = (idx >= 0) ? idx : 0;
+        }
+    }
+
     auto renderer = ui::Renderer(layout_principale, [&] {
         return ui::vbox({
                    ui::text("Create New Song") | ui::bold | ui::center,
@@ -596,4 +628,45 @@ void App::song_creation() {
     });
  
     screen.Loop(renderer);
+}
+
+
+void App::song_editing() {
+    std::vector<Song*> songs = song_bank.get_songs();
+
+    if(songs.empty()) return;
+
+    std::vector<std::string> options;
+
+    auto load_songs = [&] {
+        options.clear();
+
+        for(const auto s : songs) {
+            std::string name = s->get_name();
+
+            if(s->is_degraded())
+                name.insert(0, 1, '%');
+            else if(s->is_corrupted())
+                name.insert(0, 1, '$'); 
+
+            options.push_back(name);
+        }
+    };
+    
+    load_songs();
+
+    UIMenu menu("Choose a song to edit", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            song_creation(songs[menu.get_selected_id()]);
+            load_songs();
+            menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    });
 }
