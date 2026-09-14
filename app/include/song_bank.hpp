@@ -30,6 +30,8 @@ public:
 
     void list_songs();
 
+    void validate_song(Song* song);
+
 private:
     std::map<fs::path, Song*> bank;
     ResourceValidator validator;

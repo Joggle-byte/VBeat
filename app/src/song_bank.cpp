@@ -32,8 +32,12 @@ void SongBank::load_all(const std::string& bank_path) {
     if(bank.empty()) Logger::get_instance().log_warn("[Song Bank] song bank is empty!");
 }
 
+void SongBank::validate_song(Song* song) {
+    validator.validate(song);
+}
+
 void SongBank::clear() {
-    for(const auto i : bank)
+    for(const auto& i : bank)
         delete i.second;
     
     bank.clear();
@@ -59,6 +63,7 @@ std::vector<Song*> SongBank::get_songs() {
 
 Song* SongBank::create_song(const std::string& path) {
     Song* s = new Song();
+    
     bank[fs::path(path)] = s;
 
     return s;

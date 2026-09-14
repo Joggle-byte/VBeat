@@ -15,7 +15,7 @@ enum class TrackState {
 struct AudioTrack {
     std::string name;
     std::string file_path;
-    float volume;
+    float volume = 1.0;
     std::string device_id;
 
     TrackState state;

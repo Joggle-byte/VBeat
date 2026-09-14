@@ -129,17 +129,26 @@ std::vector<std::string> AudioPlayer::get_device_names() const {
     BASS_DEVICEINFO info;
     
     for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-        bool enabled   = (info.flags & BASS_DEVICE_ENABLED) != 0;
-        bool isDefault = (info.flags & BASS_DEVICE_DEFAULT) != 0;
-        
         if(!info.driver) continue;
 
         ret.push_back(std::string(info.name));
     }
-    Logger::get_instance().log("\n");
+
+    return ret;
 } 
 
-const std::string AudioPlayer::get_device_id_from_index(int index) const {
+std::vector<std::string> AudioPlayer::get_device_ids() const {
+    std::vector<std::string> ret;
+    BASS_DEVICEINFO info;
+    
+    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+        if(info.driver) ret.push_back(std::string(info.driver));
+    }
+
+    return ret;
+} 
+
+std::string AudioPlayer::get_device_id_from_index(int index) const {
     BASS_DEVICEINFO info;
 
     if(!BASS_GetDeviceInfo(index, &info)) return "";

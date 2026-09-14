@@ -22,7 +22,8 @@ public:
     void list_song_queue();
 
     std::vector<std::string> get_device_names() const;
-    const std::string get_device_id_from_index(int index) const;
+    std::vector<std::string> get_device_ids() const;
+    std::string get_device_id_from_index(int index) const;
 
     void queue_song(Song* song);
     void set_queue(std::vector<Song*> new_queue);

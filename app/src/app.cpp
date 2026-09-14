@@ -5,7 +5,7 @@
 #include <chrono>
 
 //TEMP
-#include <deque>
+#include <list>
 
 #include "../include/app.hpp"
 #include "../include/utils.hpp"
@@ -427,85 +427,114 @@ void App::song_play_screen(Song* song) {
 }
 
 
+struct UITrack {
+    AudioTrack data;
+    int device_index = 0;
+};
+
 void App::song_creation() {
     auto screen = ui::ScreenInteractive::TerminalOutput();
  
-    // --- Stato della canzone (placeholder: collega qui i tuoi dati reali) --
- 
     std::string nome_canzone;
  
-    // Placeholder: il tuo backend enumererà i device audio reali del
-    // sistema e popolerà questo vettore prima di costruire la UI (o lo
-    // aggiornerà dinamicamente, se vuoi supportare hot-plug).
-    std::vector<std::string> audio_devices = main_player.get_device_names();
+    std::vector<std::string> audio_devices_names = main_player.get_device_names();
+    std::vector<std::string> audio_devices_ids = main_player.get_device_ids();
  
-    std::deque<AudioTrack> tracce;
+    std::list<UITrack> tracce;
  
-    // --- Container che ospiterà le sotto-sezioni delle tracce -------------
-    // Parte vuoto: le tracce vengono aggiunte a runtime con ->Add(...).
     auto container_tracce = ui::Container::Vertical({});
  
-    // --- Funzione che costruisce la UI di UNA singola traccia -------------
-    auto crea_ui_traccia = [&](AudioTrack& stato) -> ui::Component {
-        auto input_nome = ui::Input(&stato.name, "Track name...");
+    auto crea_ui_traccia = [&](std::list<UITrack>::iterator it) -> ui::Component {
+        UITrack& stato = *it;
+
+        auto input_nome = ui::Input(&stato.data.name, "Track name...");
 
         ui::SliderOption<float> opzioni_volume;
-        opzioni_volume.value = &stato.volume;
+        opzioni_volume.value = &stato.data.volume;
         opzioni_volume.min = 0.0f;
         opzioni_volume.max = 2.0f;
         opzioni_volume.increment = 0.05f;
 
         auto slider_volume = ui::Slider<float>(opzioni_volume);
 
-        auto input_percorso = ui::Input(&stato.file_path, "File path...");
+        auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
  
-        //TODO : FIX DEVICE MENU
-        auto dropdown_device = ui::Dropdown(&audio_devices, &stato.device_id);
+        
+        //stato.device_index = AudioBus::find_device_by_driver(stato.data.device_id);
+
+        auto dropdown_device = ui::Dropdown(&audio_devices_names, &stato.device_index);
  
-        auto gruppo = ui::Container::Vertical({
-            input_nome,
-            input_volume,
-            input_percorso,
-            dropdown_device,
+        //DELETE BUTTON
+        auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
+ 
+        auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &tracce] {
+            if (auto self = self_weak_box->lock())
+                self->Detach();
+            tracce.erase(it);
         });
  
-        return ui::Renderer(gruppo, [&, input_nome, input_volume, input_percorso,
-                                  dropdown_device] {
+        
+        auto gruppo = ui::Container::Vertical({
+            input_nome,
+            input_percorso,
+            slider_volume,
+            dropdown_device,
+            btn_elimina
+        });
+
+        ui::Component componente = ui::Renderer(gruppo, [&stato, input_nome, slider_volume,
+                                                   input_percorso, dropdown_device,
+                                                   btn_elimina] {
             return ui::vbox({
-                        ui::hbox(ui::text("Name:    ") | ui::dim, input_nome->Render()),
-
-                        ui::text("Volume:  ") | ui::dim,
-                        slider_volume->Render() | ui::flex,
-                        ui::text(" " + std::to_string(stato.volume)),
-
-                        ui::hbox(ui::text("File path:    ") | ui::dim, input_percorso->Render()),
-                        ui::hbox(ui::text("Device:  ") | ui::dim, dropdown_device->Render()),
+                       ui::hbox(ui::text("Name:    ") | ui::dim, input_nome->Render()),
+                       ui::hbox(ui::text("Volume:  ") | ui::dim, slider_volume->Render() | ui::flex,
+                            ui::text(" " + std::to_string(stato.data.volume))),
+                       ui::hbox(ui::text("File:    ") | ui::dim, input_percorso->Render()),
+                       ui::hbox(ui::text("Device:  ") | ui::dim, dropdown_device->Render()),
+                       ui::separator(),
+                       btn_elimina->Render(),
                    }) |
                    ui::border;
         });
+ 
+        *self_weak_box = componente;
+        return componente;
     };
  
-    // --- Bottone "Aggiungi" ------------------------------------------------
     auto on_aggiungi_click = [&] {
-        tracce.emplace_back();                          // nuovo stato
-        container_tracce->Add(crea_ui_traccia(tracce.back()));  // nuova UI
+        tracce.emplace_back();
+        auto it = std::prev(tracce.end());
+        container_tracce->Add(crea_ui_traccia(it));
     };
  
     auto btn_aggiungi = ui::Button("+ Add Track", on_aggiungi_click);
  
-    // --- Campo nome canzone -------------------------------------------------
     auto input_nome_canzone = ui::Input(&nome_canzone, "Song name...");
  
-    // --- Bottoni finali: Salva ed esci / Annulla ----------------------------
  
     auto on_salva_click = [&] {
-        // Collega qui il tuo backend: leggi nome_canzone e itera su `tracce`
-        // per ottenere nome/volume/percorso/device di ognuna, poi chiudi.
+        if(tracce.empty() || nome_canzone.empty()) return;
+
+        std::string song_path = song_bank_path + "/" + nome_canzone + ".json";
+        Song* new_song = song_bank.create_song(song_path);
+
+        new_song->set_name(nome_canzone);
+
+        for(auto& t : tracce) {
+            t.data.device_id = audio_devices_ids[t.device_index];
+            new_song->add_track(t.data);
+        }
+        
+        Logger::get_instance().log(">>> Created new song '" + nome_canzone + "'");
+
+        song_bank.validate_song(new_song);
+
+        new_song->save_to_file(song_path);
+
         screen.ExitLoopClosure()();
     };
  
     auto on_annulla_click = [&] {
-        // Nessun salvataggio: chiudi e basta (o torna alla schermata precedente).
         screen.ExitLoopClosure()();
     };
  
@@ -533,7 +562,6 @@ void App::song_creation() {
         btn_annulla,
     });
  
-    // --- Container principale: raggruppa tutto per la navigazione ----------
     auto layout_principale = ui::Container::Vertical({
         input_nome_canzone,
         btn_aggiungi,
@@ -541,7 +569,6 @@ void App::song_creation() {
         bottoni_finali,
     });
  
-    // --- Renderer: definisce l'aspetto grafico completo ---------------------
     auto renderer = ui::Renderer(layout_principale, [&] {
         return ui::vbox({
                    ui::text("Create New Song") | ui::bold | ui::center,
@@ -558,9 +585,6 @@ void App::song_creation() {
                    }),
                    ui::separator(),
  
-                   // Il contenitore delle tracce cresce a runtime; lo metto
-                   // dentro una "frame" con altezza massima e scrollbar,
-                   // così tante tracce non fanno esplodere il layout.
                    container_tracce->Render() | ui::vscroll_indicator | ui::frame |
                        ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
  
