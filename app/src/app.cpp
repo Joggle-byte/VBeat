@@ -134,7 +134,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "Create Song", "Edit Song", "View Log", "Reload Songs & Playlists"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "✎ Edit Song", "🗎 View Log", "🗘 Reload Songs & Playlists"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -174,7 +174,7 @@ void App::show_log() {
     std::vector<std::string> lines = Logger::get_instance().get_log();
 
     int scroll_offset = 0;
-    const int viewport_height = 16; // altezza visibile dell'area
+    const int viewport_height = 20; // altezza visibile dell'area
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -354,9 +354,9 @@ void App::song_play_screen(Song* song) {
     ui::ButtonOption opzioni_bottone;
     opzioni_bottone.transform = stile_bottone;
 
-    auto btn_play  = ui::Button("Play",  on_play,  opzioni_bottone);
-    auto btn_pause = ui::Button("Pause", on_pause, opzioni_bottone);
-    auto btn_stop  = ui::Button("Stop",  on_stop,  opzioni_bottone);
+    auto btn_play  = ui::Button("▶",  on_play,  opzioni_bottone);
+    auto btn_pause = ui::Button("⏸", on_pause, opzioni_bottone);
+    auto btn_stop  = ui::Button("◼",  on_stop,  opzioni_bottone);
 
     auto controlli = ui::Container::Horizontal({
         btn_play,
@@ -540,11 +540,13 @@ void App::song_creation(Song* edit_song) {
             new_song->add_track(t.data);
         }
             
-        Logger::get_instance().log(((edit_song) ? ">>> Created new song '" : ">>> Edited new song '") + nome_canzone + "'");
-
         song_bank.validate_song(new_song);
 
-        new_song->save_to_file(song_path);
+        if(!new_song->save_to_file(song_path))
+            Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
+        else
+            Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
+
         screen.ExitLoopClosure()();
     };
  

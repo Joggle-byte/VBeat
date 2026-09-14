@@ -71,6 +71,6 @@ void ResourceValidator::validate(Song* res) {
     if(degraded_flag) {
         res->set_state(SongState::DEGRADED);
         Logger::get_instance().log_err("[SongValidator] song '" + res->get_name() + "' is degraded");
-    }
+    } else res->set_state(SongState::OK);
 }
 
