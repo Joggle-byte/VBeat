@@ -18,7 +18,7 @@ public:
 
     void clear();
 
-    Song* create_song(const std::string& path);
+    std::pair<fs::path, Song*> create_song(const std::string& directory);
 
     void append_new(Song* s);
 
@@ -27,11 +27,14 @@ public:
 
     std::vector<Song*> get_songs();
 
-    bool song_exists(const std::string& path);
+    bool song_exists(const std::string& path) const;
+
+    bool song_exists_by_name(const std::string& name) const;
 
     void list_songs();
 
     void validate_song(Song* song);
+    void validate_all();
 
 private:
     std::map<fs::path, Song*> bank;

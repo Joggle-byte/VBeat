@@ -19,7 +19,7 @@ using json = nlohmann::json;
 
 App::~App() {
     song_bank.clear();
-    playlists.clear();
+    clear_playlists();
 }
 
 int App::main() {
@@ -84,7 +84,7 @@ bool App::load_config_file() {
 
     std::ifstream file(dir / "config.json");
 
-    if(!file.is_open()) {
+    if (!file.is_open()) {
         std::cout << "[VBeat] unable to load config file. Exiting...";
         return false;
     }
@@ -93,11 +93,13 @@ bool App::load_config_file() {
 
     try {
         file >> config;
-        song_bank_path = config["song_bank_path"];
-        playlist_bank_path = config["playlist_bank_path"];
-        Logger::get_instance().set_log_file_dir(config["log_file_dir"]);
-    } catch(...) {
-        Logger::get_instance().log_err("[VBeat] unable to parse config file. Exiting...");
+        song_bank_path = config.at("song_bank_path").get<std::string>();
+        playlist_bank_path = config.at("playlist_bank_path").get<std::string>();
+        Logger::get_instance().set_log_file_dir(config.at("log_file_dir").get<std::string>());
+    } catch (const std::exception& e) {
+        Logger::get_instance().log_err(
+            std::string("[VBeat] unable to parse config file: ") + e.what()
+        );
         return false;
     }
 
@@ -123,8 +125,8 @@ void App::load_all_playlists(const std::string& bank_path) {
                 playlist->remove_song(i);
             }
         }
-        
-        playlists.push_back(playlist);
+
+        playlists[p] = playlist;
     }
 
     if(playlists.empty())
@@ -133,24 +135,50 @@ void App::load_all_playlists(const std::string& bank_path) {
         Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
 }
 
+std::pair<fs::path, Playlist*> App::create_playlist() {
+    Playlist* p = new Playlist();
+
+    fs::path path = fs::path(playlist_bank_path) / fs::path(generate_uuid_v4() + ".json");
+
+    playlists[path] = p;
+
+    return std::pair<fs::path, Playlist*>(path, p);
+}
+
 void App::clear_playlists() {
-    for(const auto i : playlists)
-        delete i;
+    for(const auto& i : playlists)
+        delete i.second;
     
     playlists.clear();
 }
 
-
-void App::list_playlists() {
-    std::cout << "\n========== PLAYLISTS ==========\n";
-
-    for(size_t i = 0; i < playlists.size(); i++) {
-        std::cout << i+1 << ". " << playlists[i]->get_name() << "\n";
-        
-        std::vector<std::string> songs = playlists[i]->get_songs();
-        for(size_t i = 0; i < songs.size(); i++)
-            std::cout << "\t" << i + 1 << ". " << song_bank.get_song(songs[i])->get_name() << "\n";
+bool App::playlist_exists(const std::string& name) const {
+    for(const auto& p : playlists) {
+        if(p.second->get_name() == name) return true;
     }
+
+    return false;
+}
+
+std::vector<Playlist*> App::get_playlists() {
+    std::vector<Playlist*> ret;
+
+    for(const auto& p : playlists) {
+        ret.push_back(p.second);
+    }
+
+    return ret;
+}
+
+std::string App::get_playlist_path(Playlist* playlist) const {
+    auto it = std::find_if(playlists.begin(), playlists.end(), 
+        [&playlist](const auto& pair) {
+            return pair.second == playlist;
+        });
+
+    if (it != playlists.end()) {
+        return it->first.string();
+    } else return "";
 }
 
 std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
@@ -171,7 +199,7 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "✎ Edit Song", "🗎 View Log", "🗘 Reload Songs & Playlists"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", "🗘 Reload Songs & Playlists"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -188,12 +216,18 @@ void App::main_loop() {
                     song_creation();
                     break;
                 case 3:
-                    song_editing();
+                    playlist_creation();
                     break;
                 case 4:
-                    show_log();
+                    song_editing();
                     break;
                 case 5:
+                    playlist_editing();
+                    break;
+                case 6:
+                    show_log();
+                    break;
+                case 7:
                     Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
                     clear_playlists();
                     song_bank.clear();
@@ -289,9 +323,10 @@ void App::playlist_selection() {
     if(playlists.empty()) return;
 
     std::vector<std::string> options;
-    options.reserve(playlists.size());
 
-    for(const auto p : playlists)
+    std::vector<Playlist*> playlist_arr = get_playlists();
+
+    for(const auto p : playlist_arr)
         options.push_back(p->get_name());
  
     UIMenu menu("Playlists", options, [&] {
@@ -300,7 +335,7 @@ void App::playlist_selection() {
 
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            song_queue_play_screen(get_songs_in_playlist(playlists[menu.get_selected_id()]));
+            song_queue_play_screen(get_songs_in_playlist(playlist_arr[menu.get_selected_id()]));
             return true;
         }
         return false;
@@ -555,10 +590,21 @@ void App::song_creation(Song* edit_song) {
  
     auto input_nome_canzone = ui::Input(&nome_canzone, "Song name...");
  
- 
     auto on_salva_click = [&] {
         if(tracce.empty() || nome_canzone.empty()) return;
         
+        if(song_bank.song_exists_by_name(nome_canzone)) {
+            if(edit_song) {
+                if(edit_song->get_name() != nome_canzone) {
+                    Logger::get_instance().log_err("[SongEditor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
+                    return;
+                }
+            } else {
+                Logger::get_instance().log_err("[SongEditor] unable to create song '" + nome_canzone + "' since it already exists");
+                return;
+            }
+        }
+
         std::string song_path;
         Song* new_song;
         
@@ -568,8 +614,10 @@ void App::song_creation(Song* edit_song) {
 
             edit_song->clear_tracks();
         } else {
-            song_path = song_bank_path + "/" + nome_canzone + ".json";
-            new_song = song_bank.create_song(song_path);
+            std::pair<fs::path, Song*> song_and_path = song_bank.create_song(song_bank_path);
+
+            new_song = song_and_path.second;
+            song_path = song_and_path.first.string();
         }
         
         new_song->set_name(nome_canzone);
@@ -671,7 +719,6 @@ void App::song_creation(Song* edit_song) {
     screen.Loop(renderer);
 }
 
-
 void App::song_editing() {
     std::vector<Song*> songs = song_bank.get_songs();
 
@@ -704,6 +751,276 @@ void App::song_editing() {
         if(event == ui::Event::Return) {
             song_creation(songs[menu.get_selected_id()]);
             load_songs();
+            menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    });
+}
+
+
+struct PlaylistEntryUI {
+    Song* canzone;
+    int canzone_index = 0;
+    ui::Component componente;
+};
+
+void App::playlist_creation(Playlist* edit_playlist) {
+    auto screen = ui::ScreenInteractive::TerminalOutput();
+ 
+    std::string nome_playlist;
+ 
+    std::vector<Song*> songs = song_bank.get_songs();
+    std::vector<std::string> song_names;
+
+    for(const auto i : songs)
+        song_names.push_back(i->get_name());
+ 
+
+    std::list<PlaylistEntryUI> canzoni_playlist;
+ 
+    auto trova_indice_canzone = [&](const Song* canzone_id) -> int {
+        auto it = std::find(songs.begin(), songs.end(), canzone_id);
+        if (it != songs.end())
+            return static_cast<int>(std::distance(songs.begin(), it));
+        return 0;
+    };
+ 
+    auto container_canzoni = ui::Container::Vertical({});
+
+    auto ricostruisci_ordine = [&] {
+        for (auto& entry : canzoni_playlist)
+            container_canzoni->Add(entry.componente);
+    };
+ 
+    std::function<ui::Component(std::list<PlaylistEntryUI>::iterator)> crea_ui_canzone;
+    crea_ui_canzone = [&](std::list<PlaylistEntryUI>::iterator it) -> ui::Component {
+        PlaylistEntryUI& entry = *it;
+        entry.canzone_index = trova_indice_canzone(entry.canzone);
+ 
+        auto dropdown_canzone = ui::Dropdown(&song_names, &entry.canzone_index);
+ 
+        // Stesso pattern di auto-rimozione sicura visto per le tracce.
+        auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
+ 
+        auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &canzoni_playlist] {
+            if (auto self = self_weak_box->lock())
+                self->Detach();
+            canzoni_playlist.erase(it);
+        });
+ 
+        auto btn_su = ui::Button("↑", [it, &canzoni_playlist, &ricostruisci_ordine] {
+            if (it != canzoni_playlist.begin()) {
+                auto prev_it = std::prev(it);
+                // Sposta `it` subito prima di `prev_it`: scambia le due
+                // voci adiacenti. splice() NON invalida iteratori/riferimenti.
+                canzoni_playlist.splice(prev_it, canzoni_playlist, it);
+                ricostruisci_ordine();
+            }
+        });
+ 
+        auto btn_giu = ui::Button("↓", [it, &canzoni_playlist, &ricostruisci_ordine] {
+            auto next_it = std::next(it);
+            if (next_it != canzoni_playlist.end()) {
+                // Sposta `it` subito dopo `next_it`.
+                canzoni_playlist.splice(std::next(next_it), canzoni_playlist, it);
+                ricostruisci_ordine();
+            }
+        });
+ 
+        auto pulsanti = ui::Container::Horizontal({
+            btn_elimina,
+            btn_su,
+            btn_giu,
+        });
+ 
+        auto gruppo = ui::Container::Vertical({
+            dropdown_canzone,
+            pulsanti,
+        });
+ 
+        ui::Component componente = ui::Renderer(gruppo, [dropdown_canzone, btn_elimina,
+                                                   btn_su, btn_giu] {
+            return ui::vbox({
+                       ui::hbox(ui::text("Song: ") | ui::dim, dropdown_canzone->Render()),
+                       ui::separator(),
+                       ui::hbox({
+                           btn_elimina->Render(),
+                           ui::filler(),
+                           btn_su->Render(),
+                           ui::text(" "),
+                           btn_giu->Render(),
+                       }),
+                   }) |
+                   ui::border;
+        });
+ 
+        entry.componente = componente;
+        *self_weak_box = componente;
+        return componente;
+    };
+ 
+    // --- Bottone "Aggiungi" --------------------------------------------------
+    auto on_aggiungi_click = [&] {
+        canzoni_playlist.emplace_back();
+        auto it = std::prev(canzoni_playlist.end());
+        container_canzoni->Add(crea_ui_canzone(it));
+    };
+ 
+    auto btn_aggiungi = ui::Button("+ Add Song", on_aggiungi_click);
+ 
+    // --- Campo nome playlist ---------------------------------------------
+    auto input_nome_playlist = ui::Input(&nome_playlist, "Playlist name...");
+ 
+    // --- Bottoni finali ----------------------------------------------------
+    auto on_salva_click = [&] {
+        if(canzoni_playlist.empty() || nome_playlist.empty()) return;
+
+        if(playlist_exists(nome_playlist)) {
+            if(edit_playlist) {
+                if(edit_playlist->get_name() != nome_playlist) {
+                    Logger::get_instance().log_err("[PlaylistEditor] unable to edit playlist '" + edit_playlist->get_name() + "' with new name '" + nome_playlist + "' since it already exists");
+                    return;
+                }
+            } else {
+                Logger::get_instance().log_err("[PlaylistEditor] unable to create new playlist '" + nome_playlist + "' since it already exists");
+                return;
+            }
+        }
+        
+        Playlist* new_playlist;
+        std::string playlist_path;
+
+        if(edit_playlist) {
+            new_playlist = edit_playlist;
+            playlist_path = get_playlist_path(edit_playlist);
+
+            edit_playlist->clear_songs();
+        } else {
+            std::pair<fs::path, Playlist*> new_playlist_and_path = create_playlist();
+
+            new_playlist = new_playlist_and_path.second;
+            playlist_path = new_playlist_and_path.first.string();
+        }
+
+        new_playlist->set_name(nome_playlist);
+
+        for (auto& entry : canzoni_playlist) {
+            entry.canzone = songs[entry.canzone_index];
+            new_playlist->add_song(song_bank.get_song_path(entry.canzone));
+        }
+
+        if(!new_playlist->save_to_file(playlist_path))
+            Logger::get_instance().log_err("[PlaylistEditor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
+        else
+            Logger::get_instance().log("[PlaylistEditor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
+
+        screen.ExitLoopClosure()();
+    };
+ 
+    auto on_annulla_click = [&] {
+        screen.ExitLoopClosure()();
+    };
+ 
+    ui::ButtonOption stile_salva;
+    stile_salva.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Green) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+ 
+    ui::ButtonOption stile_annulla;
+    stile_annulla.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+ 
+    auto btn_salva = ui::Button("Save and Back", on_salva_click, stile_salva);
+    auto btn_annulla = ui::Button("Cancel", on_annulla_click, stile_annulla);
+ 
+    auto bottoni_finali = ui::Container::Horizontal({
+        btn_salva,
+        btn_annulla,
+    });
+ 
+    // --- Container principale -----------------------------------------------
+    auto layout_principale = ui::Container::Vertical({
+        input_nome_playlist,
+        btn_aggiungi,
+        container_canzoni,
+        bottoni_finali,
+    });
+ 
+    if(edit_playlist) {
+        nome_playlist = edit_playlist->get_name();
+
+        for(const auto& i : edit_playlist->get_songs()) {
+            on_aggiungi_click();
+            PlaylistEntryUI& entry = canzoni_playlist.back();
+            entry.canzone = song_bank.get_song(i);
+            entry.canzone_index = trova_indice_canzone(entry.canzone);
+        }
+    }
+
+
+    auto renderer = ui::Renderer(layout_principale, [&] {
+        return ui::vbox({
+                   ui::text("Create new Playlist") | ui::bold | ui::center,
+                   ui::separator(),
+ 
+                   ui::hbox(ui::text("Playlist Name: ") | ui::dim, input_nome_playlist->Render()),
+ 
+                   ui::separator(),
+ 
+                   ui::hbox({
+                       ui::text("Songs") | ui::bold,
+                       ui::filler(),
+                       btn_aggiungi->Render(),
+                   }),
+                   ui::separator(),
+ 
+                   container_canzoni->Render() | ui::vscroll_indicator | ui::frame |
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+ 
+                   ui::separator(),
+                   bottoni_finali->Render() | ui::center,
+               }) |
+               ui::size(ui::WIDTH, ui::GREATER_THAN, 60) |
+               ui::border;
+    });
+ 
+    screen.Loop(renderer);
+}
+
+void App::playlist_editing() {
+    std::vector<Playlist*> playlists = get_playlists();
+
+    if(playlists.empty()) return;
+
+    std::vector<std::string> options;
+
+    auto load_playlists = [&] {
+        options.clear();
+
+        for(const auto s : playlists) {
+            options.push_back(s->get_name());
+        }
+    };
+    
+    load_playlists();
+
+    UIMenu menu("Choose a playlist to edit", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            playlist_creation(playlists[menu.get_selected_id()]);
+            load_playlists();
             menu.set_options(options);
 
             return true;

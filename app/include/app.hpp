@@ -20,7 +20,7 @@ public:
 private:
 
     SongBank song_bank;
-    std::vector<Playlist*> playlists;
+    std::map<fs::path, Playlist*> playlists;
 
     AudioPlayer main_player;
     SongEditor song_editor;
@@ -38,9 +38,15 @@ private:
 
     void load_all_playlists(const std::string& bank_path);
 
-    void clear_playlists();
+    std::pair<fs::path, Playlist*> create_playlist();
 
-    void list_playlists();
+    std::vector<Playlist*> get_playlists();
+
+    std::string get_playlist_path(Playlist* playlist) const;
+
+    bool playlist_exists(const std::string& name) const;
+
+    void clear_playlists();
 
     std::vector<Song*> get_songs_in_playlist(Playlist* playlist);
 
@@ -51,6 +57,8 @@ private:
     void show_log();
 
     void playlist_selection();
+    void playlist_creation(Playlist* edit_playlist = nullptr);
+    void playlist_editing();
 
     void song_creation(Song* song = nullptr);
     void song_editing();
