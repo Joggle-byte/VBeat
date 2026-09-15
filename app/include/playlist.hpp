@@ -14,6 +14,7 @@ public:
 
     void add_song(const std::string& song_path);
     void remove_song(int song_id);
+    void clear_songs() { song_paths.clear(); }
     void set_name(const std::string& new_name) { name = new_name; }
 
     const std::string& get_name() const { return name; }

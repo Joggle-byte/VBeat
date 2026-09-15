@@ -3,6 +3,9 @@
 #include <filesystem>
 #include <string>
 #include <cmath>
+#include <random>
+#include <sstream>
+#include <iomanip>
 
 #define VBEAT_VERSION "0.0.1"
 
@@ -34,4 +37,21 @@ inline std::string format_time_to_minutes(double seconds) {
     int f_seconds = static_cast<int>(seconds) % 60;
 
     return std::to_string(f_minutes) + ":" + ((f_seconds < 10) ? "0" : "") + std::to_string(f_seconds);
+}
+
+inline std::string generate_uuid_v4() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+    static const char* v = "0123456789abcdef";
+
+    std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+    for (char& c : uuid) {
+        if (c == 'x') {
+            c = v[dis(gen)];
+        } else if (c == 'y') {
+            c = v[(dis(gen) & 0x3) | 0x8]; // RFC 4122 variant 1
+        }
+    }
+    return uuid;
 }

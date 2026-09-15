@@ -36,6 +36,11 @@ void SongBank::validate_song(Song* song) {
     validator.validate(song);
 }
 
+void SongBank::validate_all() {
+    for(const auto& i : bank)
+        validator.validate(i.second);
+}
+
 void SongBank::clear() {
     for(const auto& i : bank)
         delete i.second;
@@ -72,18 +77,27 @@ std::vector<Song*> SongBank::get_songs() {
     return values;
 }
 
-Song* SongBank::create_song(const std::string& path) {
+std::pair<fs::path, Song*> SongBank::create_song(const std::string& directory) {
     Song* s = new Song();
-    
-    bank[fs::path(path)] = s;
+    fs::path path = fs::path(directory) / fs::path(generate_uuid_v4() + ".json");
 
-    return s;
+    bank[path] = s;
+
+    return std::pair<fs::path, Song*>(path, s);
 }
 
 
-bool SongBank::song_exists(const std::string& path) {
+bool SongBank::song_exists(const std::string& path) const {
     auto it = bank.find(fs::path(path));
     return (it != bank.end());
+}
+
+bool SongBank::song_exists_by_name(const std::string& name) const {
+    for(const auto& s : bank) {
+        if(s.second->get_name() == name) return true;
+    }
+
+    return false;
 }
 
 void SongBank::list_songs() {
