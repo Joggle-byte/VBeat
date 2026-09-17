@@ -12,7 +12,7 @@ public:
     UIMenu(const std::string& _title, std::vector<std::string> _options, std::function<void()> back_button_pressed);
     ~UIMenu();
 
-    void render(std::function<bool(ftxui::Event event)> callback);
+    void render(std::function<bool(ftxui::Event event)> callback, bool song_mode = false);
 
     int get_selected_id() const { return selected; }
 
