@@ -3,7 +3,6 @@
 #include <ftxui/ftxui.hpp>
 
 #include "audioplayer.hpp"
-#include "song_editor.hpp"
 #include "song_bank.hpp"
 
 namespace ui = ftxui;
@@ -23,7 +22,6 @@ private:
     std::map<fs::path, Playlist*> playlists;
 
     AudioPlayer main_player;
-    SongEditor song_editor;
 
     std::string song_bank_path;
     std::string playlist_bank_path;

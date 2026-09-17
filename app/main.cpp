@@ -1,10 +1,8 @@
 #include "include/app.hpp"
 
 
-App* app;
-
 int main() {
-    app = new App();
+    App* app = new App();
 
     return app->main();
 }
