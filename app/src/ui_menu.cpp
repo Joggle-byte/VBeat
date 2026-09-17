@@ -25,12 +25,12 @@ void UIMenu::select_next() {
     else selected = 0;
 }
 
-void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
+void UIMenu::render(std::function<bool(ftxui::Event event)> callback, bool song_mode) {
     ui::MenuOption opzioni = ui::MenuOption::Vertical();
     opzioni.entries = &options;
     opzioni.selected = &selected;
  
-    opzioni.entries_option.transform = [](const ui::EntryState& state) {
+    opzioni.entries_option.transform = [&song_mode](const ui::EntryState& state) {
         ui::Color bg_color;
         ui::Color color = ui::Color::White;
         bool bold = false;
@@ -40,11 +40,13 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
         if (text[0] == '$') {
             bg_color = ui::Color::Red;
             color = ui::Color::White;
-            text = text.substr(1) + " (CORRUPTED)";
+            text = text.substr(1);
+            if(song_mode) text += " (CORRUPTED)";
         } else if (text[0] == '%') {
             bg_color = ui::Color::Yellow;
             color = ui::Color::White;
-            text = text.substr(1) + " (DEGRADED)";
+            text = text.substr(1);
+            if(song_mode) text += " (DEGRADED)";
         }
 
         if (state.focused) {
@@ -90,7 +92,8 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback) {
         return ui::vbox({
                    ui::text(title) | ui::bold | ui::center,
                    ui::separatorEmpty(),
-                   menu->Render(),
+                   menu->Render() | ui::vscroll_indicator | ui::frame |
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
                    ui::separatorEmpty(),
                    ui::separatorEmpty(),
                    back_button->Render(),

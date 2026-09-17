@@ -194,12 +194,48 @@ std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
     return ret;
 }
 
+bool App::wipe_memory() {
+    Logger::get_instance().log_warn("[VBeat]>>> Wiping song bank and playlist bank");
+
+    std::vector<fs::path> all_songs = get_files_by_extension(fs::path(song_bank_path), ".json");
+    std::vector<fs::path> all_playlists = get_files_by_extension(fs::path(playlist_bank_path), ".json");
+
+    if(all_songs.empty()) {
+        Logger::get_instance().log_err("[VBeat] song bank is empty. Aborting memory wipe");
+        return false;
+    }
+
+    if(all_playlists.empty()) {
+        Logger::get_instance().log_err("[VBeat] playlist bank is empty. Aborting memory wipe");
+        return false;
+    }
+
+    for(const auto& p : all_songs) {
+        if(fs::remove(p)) {
+            Logger::get_instance().log_warn("[VBeat] succesfully removed song '" + p.string() + "'");
+        } else {
+            Logger::get_instance().log_err("[VBeat] impossible to remove song '" + p.string() + "'");
+        }
+    }
+
+    for(const auto& p : all_playlists) {
+        if(fs::remove(p)) {
+            Logger::get_instance().log_warn("[VBeat] succesfully removed playlist '" + p.string() + "'");
+        } else {
+            Logger::get_instance().log_err("[VBeat] impossible to remove playlist '" + p.string() + "'");
+        }
+    }
+
+    Logger::get_instance().log_warn("[VBeat]>>> Memory wipe completed");
+    return true;
+}
+
 
 /* SCREENS */
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", "🗘 Reload Songs & Playlists"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", "🗘 Reload Songs & Playlists", "$⚠ Wipe Memory"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -234,11 +270,42 @@ void App::main_loop() {
                     song_bank.load_all(song_bank_path);
                     load_all_playlists(playlist_bank_path);
                     break;
+                case 8:
+                    if(confirm_dialog("Are you sure you want to wipe\nall saved songs and playlists?"))
+                        wipe_memory();
+                    break;
             }
             return true;
         }
         return false;
     });
+}
+
+bool App::confirm_dialog(const std::string& title) {
+    UIMenu menu(title, {"No, Go Back", "$Yes, Go Ahead"}, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    bool ret = false;
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            switch(menu.get_selected_id()) {
+                case 0:
+                    menu.get_screen().ExitLoopClosure()();
+                    ret = false;
+                    break;
+                case 1:
+                    menu.get_screen().ExitLoopClosure()();
+                    ret = true;
+                    break;
+            }
+            return true;
+        }
+        return false;
+    });
+
+    return ret;
 }
 
 void App::show_log() {
@@ -376,12 +443,9 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
             return true;
         }
         return false;
-    });
+    }, true);
 }
 
-#include <ftxui/component/event.hpp>
-#include <ftxui/screen/box.hpp>
-// ... resto degli include che avevi già
 
 void App::song_play_screen(Song* song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
@@ -797,7 +861,7 @@ void App::song_editing() {
             return true;
         }
         return false;
-    });
+    }, true);
 }
 
 

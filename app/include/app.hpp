@@ -48,11 +48,15 @@ private:
 
     std::vector<Song*> get_songs_in_playlist(Playlist* playlist);
 
+    bool wipe_memory();
+
     /* APP MODES */
 
     void main_loop();
 
     void show_log();
+
+    bool confirm_dialog(const std::string& title);
 
     void playlist_selection();
     void playlist_creation(Playlist* edit_playlist = nullptr);

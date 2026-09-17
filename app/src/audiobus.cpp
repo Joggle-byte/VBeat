@@ -141,9 +141,9 @@ void AudioBus::free() {
 }
 
 void AudioBus::set_playback_pos(double seconds) {
-    if(pos < 0.0f) return;
+    if(seconds < 0.0f) return;
 
-    QWORD pos = BASS_ChannelSeconds2Bytes(stream, seconds);
+    QWORD pos = BASS_ChannelSeconds2Bytes(handle, seconds);
 
     if(!BASS_ChannelSetPosition(handle, pos, BASS_POS_BYTE)) {
         if(BASS_ErrorGetCode() == BASS_ERROR_POSITION) stop();
