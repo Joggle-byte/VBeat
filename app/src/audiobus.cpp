@@ -140,6 +140,16 @@ void AudioBus::free() {
     }
 }
 
+void AudioBus::set_playback_pos(double seconds) {
+    if(pos < 0.0f) return;
+
+    QWORD pos = BASS_ChannelSeconds2Bytes(stream, seconds);
+
+    if(!BASS_ChannelSetPosition(handle, pos, BASS_POS_BYTE)) {
+        if(BASS_ErrorGetCode() == BASS_ERROR_POSITION) stop();
+    }
+}
+
 std::pair<double, double> AudioBus::get_playback_duration_info() const {
     QWORD pos = BASS_ChannelGetPosition(handle, BASS_POS_BYTE);
     QWORD len = BASS_ChannelGetLength(handle, BASS_POS_BYTE);
