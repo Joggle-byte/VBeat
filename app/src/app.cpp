@@ -379,6 +379,10 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
     });
 }
 
+#include <ftxui/component/event.hpp>
+#include <ftxui/screen/box.hpp>
+// ... resto degli include che avevi già
+
 void App::song_play_screen(Song* song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -386,19 +390,18 @@ void App::song_play_screen(Song* song) {
 
     std::pair<double, double> progresso(0.0f, 0.0f);
     int longest_bus = main_player.get_longest_bus_id();
-    
-    std::string stato = "Playing";     // "Playing" / "Paused" / "Stopped"
-    Song* next_song = main_player.get_next_song();
 
+    std::string stato = "Playing";
+    Song* next_song = main_player.get_next_song();
 
     std::string prossimo_brano = "---";
 
-    if(next_song) {
+    if (next_song) {
         prossimo_brano = next_song->get_name();
 
-        if(next_song->get_state() == SongState::DEGRADED)
+        if (next_song->get_state() == SongState::DEGRADED)
             prossimo_brano += " (DEGRADED)";
-        else if(next_song->get_state() == SongState::CORRUPTED)
+        else if (next_song->get_state() == SongState::CORRUPTED)
             prossimo_brano += " (CORRUPTED)";
     }
 
@@ -432,18 +435,55 @@ void App::song_play_screen(Song* song) {
     auto btn_pause = ui::Button("⏸", on_pause, opzioni_bottone);
     auto btn_stop  = ui::Button("◼",  on_stop,  opzioni_bottone);
 
-    auto controlli = ui::Container::Horizontal({
+    auto pulsanti_riproduzione = ui::Container::Horizontal({
         btn_play,
         btn_pause,
         btn_stop,
+    });
+
+    ui::SliderOption<double> opzioni_progresso;
+    opzioni_progresso.value = &progresso.first;
+    opzioni_progresso.min = 0.0;
+    opzioni_progresso.max = &progresso.second;
+    opzioni_progresso.increment = 1.0;
+
+    auto slider_progresso = ui::Slider<double>(opzioni_progresso);
+
+    bool is_seeking = false;
+    ui::Box slider_box;
+
+    auto seek_catcher = ui::CatchEvent(slider_progresso, [&](ui::Event event) {
+        if (!event.is_mouse())
+            return false;
+
+        auto& mouse = event.mouse();
+
+        if (mouse.button == ui::Mouse::Left) {
+            if (mouse.motion == ui::Mouse::Pressed &&
+                slider_box.Contain(mouse.x, mouse.y)) {
+                is_seeking = true;
+            } else if (mouse.motion == ui::Mouse::Released && is_seeking) {
+                is_seeking = false;
+                main_player.set_playback_pos(progresso.first);
+            }
+        }
+
+        return false;
+    });
+
+    auto controlli = ui::Container::Vertical({
+        seek_catcher,
+        pulsanti_riproduzione,
     });
 
     auto renderer = ui::Renderer(controlli, [&] {
         ui::Elements bus_rows;
 
         if (main_player.is_playing()) {
-            progresso = main_player.get_bus_playback_info(longest_bus);
-                
+            if (!is_seeking) {
+                progresso = main_player.get_bus_playback_info(longest_bus);
+            }
+
             auto bus_levels = main_player.get_bus_levels();
 
             for (size_t i = 0; i < main_player.bus_count(); i++) {
@@ -464,7 +504,7 @@ void App::song_play_screen(Song* song) {
             }
 
             ui::animation::RequestAnimationFrame();
-        } else if(!main_player.is_paused()) {
+        } else if (!main_player.is_paused()) {
             screen.ExitLoopClosure()();
         }
 
@@ -472,7 +512,8 @@ void App::song_play_screen(Song* song) {
                    ui::text(titolo_brano) | ui::bold | ui::center,
                    ui::separatorEmpty(),
 
-                   ui::gauge(progresso.first / progresso.second) | ui::color(ui::Color::Green),
+                   seek_catcher->Render() | ui::reflect(slider_box),
+
                    ui::text(format_time_to_minutes(progresso.first) + " | " + format_time_to_minutes(progresso.second))
                        | ui::center | ui::dim,
 

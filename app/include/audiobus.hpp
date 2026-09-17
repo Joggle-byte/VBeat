@@ -28,6 +28,8 @@ public:
 
     void free();
 
+    void set_playback_pos(double pos);
+
     std::pair<double, double> get_playback_duration_info() const;
 
     std::pair<float, float> get_stereo_audio_levels() const;

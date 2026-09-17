@@ -242,8 +242,8 @@ void AudioPlayer::play_queue() {
 
 void AudioPlayer::pause() {
     paused = true;
-    for(size_t i = 0; i < bus_count(); i++) {
-        busses[i].pause();
+    for(auto& bus : busses) {
+        bus.pause();
     }
 }
 
@@ -259,13 +259,19 @@ void AudioPlayer::resume() {
 }
 
 void AudioPlayer::stop() {
-    for(size_t i = 0; i < bus_count(); i++) {
-        busses[i].stop();
+    for(auto& bus : busses) {
+        bus.stop();
     }
 
     //stop_preloader();
-    //playing_song = -1;
 }
+
+void AudioPlayer::set_playback_pos(double seconds) {
+    for(auto& bus : busses) {
+        bus.set_playback_pos(seconds);
+    }
+}
+
 
 int AudioPlayer::select_next_song() {
     int current_song = playing_song;

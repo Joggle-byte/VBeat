@@ -39,6 +39,9 @@ public:
     void pause();
     void stop();
     void resume();
+
+    void set_playback_pos(double seconds);
+
     int select_next_song();
     int select_next_song_looped();
 
