@@ -250,8 +250,9 @@ void AudioPlayer::set_playback_pos(double seconds) {
     for(auto& bus : busses) {
         bool can_seek = bus.set_playback_pos(seconds);
         if(can_seek) {
-            if(bus.is_stopped() && is_playing())
+            if(bus.is_stopped() && is_playing()) {
                 bus.play(false);
+            }
         }
     }
 }

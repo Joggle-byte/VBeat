@@ -111,6 +111,7 @@ bool AudioBus::is_stopped() {
 
 
 void AudioBus::play(bool restart) {
+    if(has_finished_playing) return;
     if (handle) BASS_ChannelPlay(handle, (restart) ? TRUE : FALSE);
 }
 
@@ -146,10 +147,14 @@ bool AudioBus::set_playback_pos(double seconds) {
     QWORD pos = BASS_ChannelSeconds2Bytes(handle, seconds);
 
     if(!BASS_ChannelSetPosition(handle, pos, BASS_POS_BYTE)) {
-        if(BASS_ErrorGetCode() == BASS_ERROR_POSITION) stop();
+        if(BASS_ErrorGetCode() == BASS_ERROR_POSITION) {
+            stop();
+            has_finished_playing = true;
+        }
         return false;
     }
 
+    has_finished_playing = false;
     return true;
 }
 

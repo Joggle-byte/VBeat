@@ -42,11 +42,12 @@ public:
     AudioTrack get_track() const { return track; }
 
 private:
-
     AudioTrack track;
 
     HSTREAM handle = 0;
     std::string file_path;
+
+    bool has_finished_playing = false;
 
     int init_device(const std::string& id, bool verbose);
 };
