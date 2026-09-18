@@ -30,8 +30,6 @@ public:
 
     void clear_queue();
 
-    bool load_playlist(Playlist* playlist);
-
     void play(int song_id);
     void play_current();
     void play_queue();

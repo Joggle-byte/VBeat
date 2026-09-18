@@ -70,7 +70,7 @@ bool Song::is_valid_track_id(int track_id) const {
 }   
 
 
-Song* Song::create_from_file(const std::string& path) {
+Song* Song::create_from_file(const fs::path& path) {
     std::ifstream file(path);
     if (!file.is_open())
         return nullptr;
@@ -98,11 +98,11 @@ Song* Song::create_from_file(const std::string& path) {
     return new_song;
 }
 
-bool Song::save_to_file(const std::string& path) {
+bool Song::save_to_file(const fs::path& path) {
     std::ofstream file(path);
 
     if(!file.is_open()) {
-        std::cerr << "[Song exporter] failed to open file " << path << std::endl;
+        std::cerr << "[Song exporter] failed to open file " << path.string() << std::endl;
         return false;
     }
 

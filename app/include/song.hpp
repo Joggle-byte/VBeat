@@ -2,7 +2,11 @@
 
 #include <string>
 #include <vector>
+#include <filesystem>
+
 #include "audiotrack.hpp"
+
+namespace fs = std::filesystem;
 
 
 enum class SongState {
@@ -42,8 +46,8 @@ public:
 
     size_t get_tracks_count() const { return tracks.size(); }
 
-    static Song* create_from_file(const std::string& path);
-    bool save_to_file(const std::string& path);
+    static Song* create_from_file(const fs::path& path);
+    bool save_to_file(const fs::path& path);
 
 
 private:

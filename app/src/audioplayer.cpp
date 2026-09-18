@@ -70,26 +70,6 @@ bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     return loaded_tracks > 0;
 }
 
-bool AudioPlayer::load_playlist(Playlist* playlist) {
-    if(!playlist) return false;
-
-    Logger::get_instance().log("[AudioPlayer] loading playlist '" + playlist->get_name() + "'...");
-
-    queued_songs.clear();
-
-    for(const auto& path : playlist->get_songs()) {
-        Song* song = Song::create_from_file(path);
-
-        if(!song) {
-            Logger::get_instance().log_err("[AudioPlayer] unable to load playlist '" + playlist->get_name() + "'");
-            return false;
-        }
-        queue_song(song);
-    }
-
-    Logger::get_instance().log("[AudioPlayer] playlist '" + playlist->get_name() + "' loaded succesfully");
-    return true;
-}
 
 void AudioPlayer::swap_buffers() {
     //std::lock_guard<std::mutex> lock(mtx);
