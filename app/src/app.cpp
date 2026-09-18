@@ -270,7 +270,7 @@ bool App::wipe_memory() {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", "🗘 Reload Songs & Playlists", "$⚠ Wipe Memory"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "View Log", "Reload Songs & Playlists", "$⚠ Wipe Memory"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -541,9 +541,9 @@ void App::song_play_screen(Song* song) {
     ui::ButtonOption opzioni_bottone;
     opzioni_bottone.transform = stile_bottone;
 
-    auto btn_play  = ui::Button("▶",  on_play,  opzioni_bottone);
-    auto btn_pause = ui::Button("⏸", on_pause, opzioni_bottone);
-    auto btn_stop  = ui::Button("◼",  on_stop,  opzioni_bottone);
+    auto btn_play  = ui::Button("Play",  on_play,  opzioni_bottone);
+    auto btn_pause = ui::Button("Pause", on_pause, opzioni_bottone);
+    auto btn_stop  = ui::Button("Stop",  on_stop,  opzioni_bottone);
 
     auto pulsanti_riproduzione = ui::Container::Horizontal({
         btn_play,
