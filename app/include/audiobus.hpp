@@ -28,7 +28,7 @@ public:
 
     void free();
 
-    void set_playback_pos(double pos);
+    bool set_playback_pos(double pos);
 
     std::pair<double, double> get_playback_duration_info() const;
 
