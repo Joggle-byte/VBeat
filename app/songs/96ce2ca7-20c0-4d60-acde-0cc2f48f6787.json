@@ -8,7 +8,7 @@
             "volume": 1.0
         },
         {
-            "device": "",
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
             "name": "Click",
             "path": "C:\\Users\\emaal\\Dropbox\\Scambio Lady Godiva\\Sequenze\\Mad_World_click.wav",
             "volume": 1.0
