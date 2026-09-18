@@ -18,7 +18,7 @@ void SongBank::load_all(const std::string& bank_path) {
     std::vector<fs::path> all = get_files_by_extension(fs::path(bank_path), ".json");
 
     for(const auto& p : all) {
-        Song* s = Song::create_from_file(p.string());
+        Song* s = Song::create_from_file(p);
 
         if(!s) {
             Logger::get_instance().log(std::string(ERROR_COL) + "[Song Bank] unable to load song '" + p.string() + "'" + std::string(END));
@@ -26,8 +26,10 @@ void SongBank::load_all(const std::string& bank_path) {
         }
         
         validator.validate(s);
-        bank[p] = s;
+        bank[p.stem().string()] = s;
     }
+
+    this->bank_path = bank_path;
 
     if(bank.empty()) Logger::get_instance().log_warn("[Song Bank] song bank is empty!");
 }
@@ -48,22 +50,37 @@ void SongBank::clear() {
     bank.clear();
 }
 
-Song* SongBank::get_song(const std::string& path) {
-    auto it = bank.find(fs::path(path));
+Song* SongBank::get_song(const std::string& uid) {
+    auto it = bank.find(uid);
     if (it != bank.end()) return it->second;
 
     return nullptr;
 }
 
-std::string SongBank::get_song_path(const Song* song) const {
+const std::string SongBank::get_song_uid(const Song* song) const {
     auto it = std::find_if(bank.begin(), bank.end(), 
         [&song](const auto& pair) {
             return pair.second == song;
         });
 
     if (it != bank.end()) {
-        return it->first.string();
+        return it->first;
     } else return "";
+}
+
+fs::path SongBank::get_song_path(const Song* song) const {
+    if(bank_path.empty()) return fs::path();
+
+    return fs::path(bank_path) / fs::path(get_song_uid(song) + ".json");
+}
+
+fs::path SongBank::get_song_path(const std::string& uid) const {
+    auto it = bank.find(uid);
+
+    if(it != bank.end())
+        return fs::path(bank_path) / fs::path(uid + ".json");
+    
+    return fs::path();
 }
 
 std::vector<Song*> SongBank::get_songs() {
@@ -77,18 +94,26 @@ std::vector<Song*> SongBank::get_songs() {
     return values;
 }
 
-std::pair<fs::path, Song*> SongBank::create_song(const std::string& directory) {
+std::pair<std::string, Song*> SongBank::create_song() {
     Song* s = new Song();
-    fs::path path = fs::path(directory) / fs::path(generate_uuid_v4() + ".json");
+    std::string uid = generate_uuid_v4();
 
-    bank[path] = s;
+    bank[uid] = s;
 
-    return std::pair<fs::path, Song*>(path, s);
+    return std::pair<std::string, Song*>(uid, s);
 }
 
+bool SongBank::save_song_to_file(const std::string& uid) {
+    Song* song = get_song(uid);
 
-bool SongBank::song_exists(const std::string& path) const {
-    auto it = bank.find(fs::path(path));
+    if(!song)
+        return false;
+
+    return song->save_to_file(get_song_path(uid));
+}
+
+bool SongBank::song_exists(const std::string& uid) const {
+    auto it = bank.find(uid);
     return (it != bank.end());
 }
 

@@ -72,7 +72,7 @@ void App::load_all_playlists(const std::string& bank_path) {
     std::vector<fs::path> all = get_files_by_extension(fs::path(bank_path), ".json");
 
     for(const auto& p : all) {
-        Playlist* playlist = Playlist::create_from_file(p.string());
+        Playlist* playlist = Playlist::create_from_file(p);
 
         if(!playlist) {
             Logger::get_instance().log_err("[Playlist Bank] unable to load playlist '" + p.string() + "'");
@@ -83,12 +83,12 @@ void App::load_all_playlists(const std::string& bank_path) {
 
         for(size_t i = 0; i < songs.size(); i++) {
             if(!song_bank.song_exists(songs[i])) {
-                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with id " + std::to_string(i) + " doesn't exist in song bank");
+                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with uid '" + songs[i] + "' doesn't exist in song bank");
                 playlist->remove_song(i);
             }
         }
 
-        playlists[p] = playlist;
+        playlists[p.stem().string()] = playlist;
     }
 
     if(playlists.empty())
@@ -97,14 +97,29 @@ void App::load_all_playlists(const std::string& bank_path) {
         Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
 }
 
-std::pair<fs::path, Playlist*> App::create_playlist() {
+std::pair<std::string, Playlist*> App::create_playlist() {
     Playlist* p = new Playlist();
 
-    fs::path path = fs::path(playlist_bank_path) / fs::path(generate_uuid_v4() + ".json");
+    std::string uid = generate_uuid_v4();
 
-    playlists[path] = p;
+    playlists[uid] = p;
 
-    return std::pair<fs::path, Playlist*>(path, p);
+    return std::pair<std::string, Playlist*>(uid, p);
+}
+
+bool App::save_playlist_to_file(const std::string& uid) {
+    Playlist* playlist = get_playlist(uid);
+
+    if(!playlist) return false;
+
+    return playlist->save_to_file(get_playlist_path(uid));
+}
+
+Playlist* App::get_playlist(const std::string& uid) {
+    auto it = playlists.find(uid);
+    if (it != playlists.end()) return it->second;
+
+    return nullptr;
 }
 
 void App::clear_playlists() {
@@ -132,14 +147,34 @@ std::vector<Playlist*> App::get_playlists() {
     return ret;
 }
 
-std::string App::get_playlist_path(Playlist* playlist) const {
+fs::path App::get_playlist_path(Playlist* playlist) const {
     auto it = std::find_if(playlists.begin(), playlists.end(), 
         [&playlist](const auto& pair) {
             return pair.second == playlist;
         });
 
     if (it != playlists.end()) {
-        return it->first.string();
+        return fs::path(playlist_bank_path) / fs::path(it->first + ".json");
+    } else return fs::path();
+}
+
+fs::path App::get_playlist_path(const std::string& uid) const {
+    auto it = playlists.find(uid);
+
+    if(it != playlists.end())
+        return fs::path(playlist_bank_path) / fs::path(uid + ".json");
+    
+    return fs::path();
+}
+
+const std::string App::get_playlist_uid(Playlist* playlist) const {
+    auto it = std::find_if(playlists.begin(), playlists.end(), 
+        [&playlist](const auto& pair) {
+            return pair.second == playlist;
+        });
+
+    if (it != playlists.end()) {
+        return it->first;
     } else return "";
 }
 
@@ -672,19 +707,19 @@ void App::song_creation(Song* edit_song) {
             }
         }
 
-        std::string song_path;
+        std::string song_uid;
         Song* new_song;
         
         if(edit_song) {
             new_song = edit_song;
-            song_path = song_bank.get_song_path(edit_song);
+            song_uid = song_bank.get_song_uid(edit_song);
 
             edit_song->clear_tracks();
         } else {
-            std::pair<fs::path, Song*> song_and_path = song_bank.create_song(song_bank_path);
+            std::pair<std::string, Song*> song_and_uid = song_bank.create_song();
 
-            new_song = song_and_path.second;
-            song_path = song_and_path.first.string();
+            new_song = song_and_uid.second;
+            song_uid = song_and_uid.first;
         }
         
         new_song->set_name(nome_canzone);
@@ -696,7 +731,7 @@ void App::song_creation(Song* edit_song) {
             
         song_bank.validate_song(new_song);
 
-        if(!new_song->save_to_file(song_path))
+        if(!song_bank.save_song_to_file(song_uid))
             Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
         else
             Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
@@ -868,7 +903,6 @@ void App::playlist_creation(Playlist* edit_playlist) {
  
         auto dropdown_canzone = ui::Dropdown(&song_names, &entry.canzone_index);
  
-        // Stesso pattern di auto-rimozione sicura visto per le tracce.
         auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
  
         auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &canzoni_playlist] {
@@ -880,8 +914,6 @@ void App::playlist_creation(Playlist* edit_playlist) {
         auto btn_su = ui::Button("↑", [it, &canzoni_playlist, &ricostruisci_ordine] {
             if (it != canzoni_playlist.begin()) {
                 auto prev_it = std::prev(it);
-                // Sposta `it` subito prima di `prev_it`: scambia le due
-                // voci adiacenti. splice() NON invalida iteratori/riferimenti.
                 canzoni_playlist.splice(prev_it, canzoni_playlist, it);
                 ricostruisci_ordine();
             }
@@ -890,7 +922,6 @@ void App::playlist_creation(Playlist* edit_playlist) {
         auto btn_giu = ui::Button("↓", [it, &canzoni_playlist, &ricostruisci_ordine] {
             auto next_it = std::next(it);
             if (next_it != canzoni_playlist.end()) {
-                // Sposta `it` subito dopo `next_it`.
                 canzoni_playlist.splice(std::next(next_it), canzoni_playlist, it);
                 ricostruisci_ordine();
             }
@@ -928,7 +959,6 @@ void App::playlist_creation(Playlist* edit_playlist) {
         return componente;
     };
  
-    // --- Bottone "Aggiungi" --------------------------------------------------
     auto on_aggiungi_click = [&] {
         canzoni_playlist.emplace_back();
         auto it = std::prev(canzoni_playlist.end());
@@ -937,10 +967,8 @@ void App::playlist_creation(Playlist* edit_playlist) {
  
     auto btn_aggiungi = ui::Button("+ Add Song", on_aggiungi_click);
  
-    // --- Campo nome playlist ---------------------------------------------
     auto input_nome_playlist = ui::Input(&nome_playlist, "Playlist name...");
  
-    // --- Bottoni finali ----------------------------------------------------
     auto on_salva_click = [&] {
         if(canzoni_playlist.empty() || nome_playlist.empty()) return;
 
@@ -957,28 +985,28 @@ void App::playlist_creation(Playlist* edit_playlist) {
         }
         
         Playlist* new_playlist;
-        std::string playlist_path;
+        std::string playlist_uid;
 
         if(edit_playlist) {
             new_playlist = edit_playlist;
-            playlist_path = get_playlist_path(edit_playlist);
+            playlist_uid = get_playlist_uid(edit_playlist);
 
             edit_playlist->clear_songs();
         } else {
-            std::pair<fs::path, Playlist*> new_playlist_and_path = create_playlist();
+            std::pair<std::string, Playlist*> new_playlist_and_uid = create_playlist();
 
-            new_playlist = new_playlist_and_path.second;
-            playlist_path = new_playlist_and_path.first.string();
+            new_playlist = new_playlist_and_uid.second;
+            playlist_uid = new_playlist_and_uid.first;
         }
 
         new_playlist->set_name(nome_playlist);
 
         for (auto& entry : canzoni_playlist) {
             entry.canzone = songs[entry.canzone_index];
-            new_playlist->add_song(song_bank.get_song_path(entry.canzone));
+            new_playlist->add_song(song_bank.get_song_uid(entry.canzone));
         }
 
-        if(!new_playlist->save_to_file(playlist_path))
+        if(!save_playlist_to_file(playlist_uid))
             Logger::get_instance().log_err("[PlaylistEditor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
         else
             Logger::get_instance().log("[PlaylistEditor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
@@ -1014,7 +1042,6 @@ void App::playlist_creation(Playlist* edit_playlist) {
         btn_annulla,
     });
  
-    // --- Container principale -----------------------------------------------
     auto layout_principale = ui::Container::Vertical({
         input_nome_playlist,
         btn_aggiungi,

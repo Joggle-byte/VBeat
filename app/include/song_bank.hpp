@@ -18,16 +18,22 @@ public:
 
     void clear();
 
-    std::pair<fs::path, Song*> create_song(const std::string& directory);
+    std::pair<std::string, Song*> create_song();
+
+    bool save_song_to_file(const std::string& uid);
 
     void append_new(Song* s);
 
-    Song* get_song(const std::string& path);
-    std::string get_song_path(const Song* song) const;
+    Song* get_song(const std::string& uid);
+
+    const std::string get_song_uid(const Song* song) const;
+
+    fs::path get_song_path(const Song* song) const;
+    fs::path get_song_path(const std::string& uid) const;
 
     std::vector<Song*> get_songs();
 
-    bool song_exists(const std::string& path) const;
+    bool song_exists(const std::string& uid) const;
 
     bool song_exists_by_name(const std::string& name) const;
 
@@ -37,6 +43,8 @@ public:
     void validate_all();
 
 private:
-    std::map<fs::path, Song*> bank;
+    std::map<std::string, Song*> bank;
     ResourceValidator validator;
+
+    std::string bank_path;
 };

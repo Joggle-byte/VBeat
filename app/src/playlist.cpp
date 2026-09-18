@@ -9,34 +9,34 @@ using json = nlohmann::json;
 
 
 Playlist::~Playlist() {
-    song_paths.clear();
+    song_uids.clear();
 }
 
-void Playlist::add_song(const std::string& song_path) {
-    song_paths.push_back(song_path);
+void Playlist::add_song(const std::string& song_uid) {
+    song_uids.push_back(song_uid);
 }
 
 void Playlist::remove_song(int song_id) {
-    if (is_valid_song_id(song_id)) song_paths.erase(song_paths.begin() + song_id);
+    if (is_valid_song_id(song_id)) song_uids.erase(song_uids.begin() + song_id);
 }
 
-Playlist* Playlist::create_from_file(const std::string& path) {
+Playlist* Playlist::create_from_file(const fs::path& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
-        std::cerr << "[Playlist importer] failed to open file " << path << std::endl;
+        std::cerr << "[Playlist importer] failed to open file " << path.string() << std::endl;
         return nullptr;
     }
 
     Playlist* new_playlist = new Playlist();
 
     json data;
-    file >> data;
 
     try {
+        file >> data;
         new_playlist->name = data["name"];
         
-        for(const auto& path : data["songs"]) {
-            new_playlist->add_song(path);
+        for(const auto& song_uid : data["songs"]) {
+            new_playlist->add_song(song_uid);
         }
     } catch(...) {
         return nullptr;
@@ -45,11 +45,11 @@ Playlist* Playlist::create_from_file(const std::string& path) {
     return new_playlist;
 }
 
-bool Playlist::save_to_file(const std::string& path) {
+bool Playlist::save_to_file(const fs::path& path) {
     std::ofstream file(path);
 
     if(!file.is_open()) {
-        std::cerr << "[Playlist exporter] failed to open file " << path << std::endl;
+        std::cerr << "[Playlist exporter] failed to open file " << path.string() << std::endl;
         return false;
     }
 
@@ -58,7 +58,7 @@ bool Playlist::save_to_file(const std::string& path) {
     j["name"] = name;
     j["songs"] = json::array();
 
-    for(const auto& s : song_paths)
+    for(const auto& s : song_uids)
         j["songs"].push_back(s);
     
     file << std::setw(4) << j << std::endl;
@@ -68,5 +68,5 @@ bool Playlist::save_to_file(const std::string& path) {
 }
 
 bool Playlist::is_valid_song_id(int id) const {
-    return id >= 0 && id < static_cast<int>(song_paths.size());
+    return id >= 0 && id < static_cast<int>(song_uids.size());
 }
