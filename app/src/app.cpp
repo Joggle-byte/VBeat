@@ -413,16 +413,24 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
 
     std::vector<std::string> options;
 
-    for(const auto s : queue) {
-        std::string name = s->get_name();
+    auto load_songs = [&] {
+        options.clear();
 
-        if(s->is_degraded())
-           name.insert(0, 1, '%');
-        else if(s->is_corrupted())
-           name.insert(0, 1, '$'); 
+        for(const auto s : queue) {
+            song_bank.validate_song(s);
 
-        options.push_back(name);
-    }
+            std::string name = s->get_name();
+
+            if(s->is_degraded())
+            name.insert(0, 1, '%');
+            else if(s->is_corrupted())
+            name.insert(0, 1, '$'); 
+
+            options.push_back(name);
+        }
+    };
+
+    load_songs();
 
     UIMenu menu("Songs", options, [&] { 
         menu.get_screen().ExitLoopClosure()();
@@ -436,6 +444,9 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
         if(event == ui::Event::Return) {
             main_player.play(menu.get_selected_id());
             song_play_screen(main_player.get_current_song());
+            
+            load_songs();
+            menu.set_options(options);
             menu.set_selected(main_player.select_next_song_looped());
             return true;
         }
@@ -729,8 +740,6 @@ void App::song_creation(Song* edit_song) {
             new_song->add_track(t.data);
         }
             
-        song_bank.validate_song(new_song);
-
         if(!song_bank.save_song_to_file(song_uid))
             Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
         else
@@ -832,6 +841,8 @@ void App::song_editing() {
         options.clear();
 
         for(const auto s : songs) {
+            song_bank.validate_song(s);
+
             std::string name = s->get_name();
 
             if(s->is_degraded())
