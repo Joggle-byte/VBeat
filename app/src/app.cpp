@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <thread>
 #include <chrono>
+#include <algorithm>
 
 //TEMP
 #include <list>
@@ -309,7 +310,7 @@ void App::show_log() {
     std::vector<std::string> lines = Logger::get_instance().get_log();
 
     int scroll_offset = 0;
-    const int viewport_height = 20; // altezza visibile dell'area
+    const int viewport_height = 25; // visible log height
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -458,6 +459,8 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
 void App::song_play_screen(Song* song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
+    bool is_first_frame = true;
+
     std::string titolo_brano = song->get_name();
 
     std::pair<double, double> progresso(0.0f, 0.0f);
@@ -467,6 +470,10 @@ void App::song_play_screen(Song* song) {
     Song* next_song = main_player.get_next_song();
 
     std::string prossimo_brano = "---";
+
+    auto marker_layout = main_player.get_current_marker_layout();
+    std::string marker_line;
+
 
     if (next_song) {
         prossimo_brano = next_song->get_name();
@@ -543,74 +550,200 @@ void App::song_play_screen(Song* song) {
         return false;
     });
 
-    auto controlli = ui::Container::Vertical({
-        seek_catcher,
-        pulsanti_riproduzione,
-    });
 
-    auto renderer = ui::Renderer(controlli, [&] {
+    int bus_scroll_offset = 0;
+    ui::Box bus_list_box;
+
+    auto lista_bus_component = ui::Renderer([&] {
         ui::Elements bus_rows;
 
         if (main_player.is_playing()) {
-            if (!is_seeking) {
-                progresso = main_player.get_bus_playback_info(longest_bus);
-            }
-
             auto bus_levels = main_player.get_bus_levels();
 
             for (size_t i = 0; i < main_player.bus_count(); i++) {
                 AudioTrack track = main_player.get_bus(i)->get_track();
+                std::string bus_device_name;
+
+                if (track.state == TrackState::DEVICE_MISSING)
+                    bus_device_name = "⚠ DEVICE UNAVAILABLE";
+                else
+                    bus_device_name = main_player.get_device_name_from_id(track.device_id);
+
                 bus_rows.push_back(
                     ui::hbox({
-                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 12),
+                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 15),
                         ui::separatorEmpty(),
                         ui::vbox({
                             ui::gauge(bus_levels[i].first) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
                             ui::gauge(bus_levels[i].second) | ui::color(ui::Color::Cyan),
-                            ui::separatorEmpty()
+                            ui::separatorEmpty(),
+                            ui::text("→ " + bus_device_name) | ui::size(ui::WIDTH, ui::EQUAL, 30)
                         }) | ui::flex,
                         ui::filler() | ui::flex
                     })
                 );
             }
+        }
 
+        return ui::vbox(std::move(bus_rows))
+            | ui::focusPosition(0, bus_scroll_offset)  // scorri per mostrare questa riga
+            | ui::vscroll_indicator                     // la "sidebar" con la barra
+            | ui::frame                                 // clippa + abilita lo scroll
+            | ui::size(ui::HEIGHT, ui::LESS_THAN, 18);   // altezza massima visibile
+    });
+
+    auto lista_bus_scrollabile = ui::CatchEvent(lista_bus_component, [&](ui::Event event) {
+        if (!event.is_mouse())
+            return false;
+
+        auto& mouse = event.mouse();
+        if (!bus_list_box.Contain(mouse.x, mouse.y))
+            return false;
+
+        if (mouse.button == ui::Mouse::WheelDown) {
+            bus_scroll_offset = std::min(bus_scroll_offset + 3,
+                                        std::max(0, (int)main_player.bus_count() * 6));
+            return true;
+        }
+        if (mouse.button == ui::Mouse::WheelUp) {
+            bus_scroll_offset = std::max(bus_scroll_offset - 3, 0);
+            return true;
+        }
+        return false;
+    });
+
+
+    auto controlli = ui::Container::Vertical({
+        seek_catcher,
+        lista_bus_scrollabile,
+        pulsanti_riproduzione,
+    });
+
+    auto build_marker_line = [&] {
+        if(marker_layout.empty()) return;
+
+        int width = slider_box.x_max - slider_box.x_min + 1;
+
+        std::string buffer(width, ' ');
+
+        std::vector<int> marker_idx;
+        std::vector<std::string> marker_names;
+
+        marker_idx.reserve(marker_layout.size() + 1);
+
+        marker_idx.push_back(-1);
+
+        for(const auto& i : marker_layout) {
+            int idx = static_cast<int>(std::round(i.first * width));
+            buffer[idx] = '|';
+
+            marker_idx.push_back(idx);
+            marker_names.push_back(i.second.get_name());
+        }
+
+        for(int i = 1; i < static_cast<int>(marker_idx.size()); i++) {
+            int start = marker_idx[i - 1] + 1;
+            int end = std::max(0, marker_idx[i] - 1);
+            int len = end - start + 1;
+            int half = static_cast<int>(std::floor(len / 2));
+            std::string& name = marker_names[i - 1];
+
+            if(len <= static_cast<int>(name.size())) {
+                for(int j = start; j <= end; j++) {
+                    buffer[j] = name[j - start];
+                }
+            } else {
+                int name_half = static_cast<int>(std::floor(name.size() / 2));
+                
+                int local_start = half - name_half;
+                int local_end = half - name_half + name.size() - 1;
+
+                for(int j = local_start; j <= local_end; j++) {
+                    buffer[start + j] = name[j - local_start];
+                }
+            }
+
+        }
+
+        marker_line = buffer;
+    };
+
+    // |                |                 |                  |         h
+
+    auto get_current_marker = [&] (double current_time) -> const Marker* {
+        if(marker_layout.empty()) return nullptr;
+
+        const Marker* least_of_leasts = nullptr;
+        double least_timestamp = INFINITY;
+
+        for(const auto& i : marker_layout) {
+            double timestamp = i.second.get_timestamp();
+            if(current_time <= timestamp) {
+                if(timestamp < least_timestamp) {
+                    least_timestamp = timestamp;
+                    least_of_leasts = &i.second;
+                }
+            }
+        }
+
+        return least_of_leasts;
+    };
+
+    auto renderer = ui::Renderer(controlli, [&] {
+        if (main_player.is_playing()) {
+            if (!is_seeking) {
+                progresso = main_player.get_bus_playback_info(longest_bus);
+            }
             ui::animation::RequestAnimationFrame();
         } else if (!main_player.is_paused()) {
             screen.ExitLoopClosure()();
         }
 
+        if(!is_first_frame) build_marker_line();
+
+        const Marker* current_marker = get_current_marker(progresso.first);
+        std::string current_section_name = (current_marker) ? current_marker->get_name() : "---";
+
+        is_first_frame = false;
+
         return ui::vbox({
-                   ui::text(titolo_brano) | ui::bold | ui::center,
-                   ui::separatorEmpty(),
+                ui::text(titolo_brano) | ui::bold | ui::center,
+                ui::separatorEmpty(),
 
-                   seek_catcher->Render() | ui::reflect(slider_box),
+                ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight),
+                seek_catcher->Render() | ui::reflect(slider_box),
 
-                   ui::text(format_time_to_minutes(progresso.first) + " | " + format_time_to_minutes(progresso.second))
-                       | ui::center | ui::dim,
+                ui::text(format_time_to_minutes(progresso.first) + " | " + format_time_to_minutes(progresso.second))
+                    | ui::center | ui::dim,
 
-                   ui::separator(),
-                   ui::vbox(std::move(bus_rows)),
-                   ui::separator(),
+                ui::separatorEmpty(),
+                ui::text("Section: " + current_section_name) | ui::bold | ui::center | ui::color(ui::Color::GreenLight),
 
-                   ui::hbox({
-                       ui::filler(),
-                       btn_play->Render(),
-                       ui::text(" "),
-                       btn_pause->Render(),
-                       ui::text(" "),
-                       btn_stop->Render(),
-                       ui::filler(),
-                   }),
+                ui::separator(),
 
-                   ui::separator(),
+                lista_bus_scrollabile->Render() | ui::reflect(bus_list_box),
 
-                   ui::text("State: " + stato) | ui::center,
+                ui::separator(),
 
-                   ui::text("Next: " + prossimo_brano) | ui::center | ui::dim,
-               }) |
-               ui::size(ui::WIDTH, ui::GREATER_THAN, 50) |
-               ui::border;
+                ui::hbox({
+                    ui::filler(),
+                    btn_play->Render(),
+                    ui::text(" "),
+                    btn_pause->Render(),
+                    ui::text(" "),
+                    btn_stop->Render(),
+                    ui::filler(),
+                }),
+
+                ui::separator(),
+
+                ui::text("State: " + stato) | ui::center,
+
+                ui::text("Next: " + prossimo_brano) | ui::center | ui::dim,
+            }) |
+            ui::size(ui::WIDTH, ui::GREATER_THAN, 50) |
+            ui::border;
     });
 
     screen.Loop(renderer);
@@ -818,7 +951,7 @@ void App::song_creation(Song* edit_song) {
                    ui::separator(),
  
                    container_tracce->Render() | ui::vscroll_indicator | ui::frame |
-                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 25),
  
                    ui::separator(),
                    bottoni_finali->Render() | ui::center,
@@ -1089,7 +1222,7 @@ void App::playlist_creation(Playlist* edit_playlist) {
                    ui::separator(),
  
                    container_canzoni->Render() | ui::vscroll_indicator | ui::frame |
-                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 25),
  
                    ui::separator(),
                    bottoni_finali->Render() | ui::center,

@@ -1,0 +1,23 @@
+{
+    "name": "Enjoy the Silence",
+    "tracks": [
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Sequenza",
+            "path": "audio\\enjoy-the-silence\\enjoy-sequenza.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Click",
+            "path": "audio\\enjoy-the-silence\\enjoy-click.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Count-in",
+            "path": "audio\\enjoy-the-silence\\enjoy-countin.wav",
+            "volume": 1.0
+        }
+    ]
+}

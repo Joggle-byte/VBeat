@@ -42,6 +42,35 @@ Song* AudioPlayer::get_current_song() const {
 }
 
 
+// Markers
+
+std::map<double, Marker> AudioPlayer::get_current_marker_layout() {
+    Song* current_song = get_current_song();
+
+    if(!current_song) return {};
+    if(busses.empty()) return {};
+    
+    auto markers = current_song->get_markers();
+
+    if(markers.empty()) return {};
+
+    auto song_duration_info = get_bus_playback_info(get_longest_bus_id());
+
+    std::map<double, Marker> ret;
+
+    for(const auto& i : markers) {
+        if(i.second.get_timestamp() > song_duration_info.second) 
+            ret[song_duration_info.second] = i.second;
+        else
+            ret[i.second.get_timestamp() / song_duration_info.second] = i.second;
+    }
+
+    return ret;
+}
+
+//
+
+
 bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     if(!new_song) return false;
 
@@ -95,6 +124,7 @@ void AudioPlayer::list_devices() {
     Logger::get_instance().log("\n");
 }
 
+// Deprecated
 void AudioPlayer::list_song_queue() {
     std::cout << "\n=== SONG QUEUE ===\n";
 
@@ -135,6 +165,18 @@ std::string AudioPlayer::get_device_id_from_index(int index) const {
     if(!info.driver) return "";
 
     return std::string(info.driver);
+}
+
+std::string AudioPlayer::get_device_name_from_id(const std::string& id) const {
+    BASS_DEVICEINFO info;
+    
+    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
+        if(info.driver) {
+            if(std::string(info.driver) == id) return info.name;
+        }
+    }
+
+    return "";
 }
 
 

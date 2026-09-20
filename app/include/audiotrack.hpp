@@ -4,6 +4,7 @@
 
 
 enum class TrackState {
+    INVALID_TRACK,
     OK,
     DEVICE_MISSING,
     FILE_MISSING,

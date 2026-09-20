@@ -23,7 +23,9 @@ public:
 
     std::vector<std::string> get_device_names() const;
     std::vector<std::string> get_device_ids() const;
+
     std::string get_device_id_from_index(int index) const;
+    std::string get_device_name_from_id(const std::string& id) const;
 
     void queue_song(Song* song);
     void set_queue(std::vector<Song*> new_queue);
@@ -42,6 +44,10 @@ public:
 
     int select_next_song();
     int select_next_song_looped();
+
+    // Markers
+    std::map<double, Marker> get_current_marker_layout();
+    //
 
     bool is_playing();
 

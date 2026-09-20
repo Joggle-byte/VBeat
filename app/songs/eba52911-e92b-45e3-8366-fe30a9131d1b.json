@@ -1,0 +1,23 @@
+{
+    "name": "Mad about You",
+    "tracks": [
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Sequenza",
+            "path": "audio\\mad-about-you\\mad-about-you-sequenza.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Click",
+            "path": "audio\\mad-about-you\\mad-about-you-click.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Count-in",
+            "path": "audio\\mad-about-you\\mad-about-you-countin.wav",
+            "volume": 1.0
+        }
+    ]
+}

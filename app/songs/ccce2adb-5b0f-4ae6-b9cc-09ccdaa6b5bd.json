@@ -1,0 +1,29 @@
+{
+    "name": "It's my life",
+    "tracks": [
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Sequenza",
+            "path": "audio\\its-my-life\\its-my-life-sequenza.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Click",
+            "path": "audio\\its-my-life\\its-my-life-click.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "{0.0.0.00000000}.{bdb484d3-6a10-4c24-af14-f6137187a0ee}",
+            "name": "Cori",
+            "path": "audio\\its-my-life\\its-my-life-cori.wav",
+            "volume": 1.0
+        },
+        {
+            "device": "",
+            "name": "Count-in",
+            "path": "audio\\its-my-life\\its-my-life-countin.wav",
+            "volume": 1.0
+        }
+    ]
+}

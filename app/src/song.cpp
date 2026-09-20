@@ -58,6 +58,7 @@ void Song::set_track_state(int track_id, TrackState state) {
 TrackState Song::get_track_state(int track_id) const {
     if(is_valid_track_id(track_id))
         return tracks[track_id].state;
+    return TrackState::INVALID_TRACK;
 }
 
 const AudioTrack& Song::get_track(int track_id) {
@@ -91,6 +92,12 @@ Song* Song::create_from_file(const fs::path& path) {
                 track["device"]
             });
         }
+
+        if(data.contains("markers")) {
+            for(const auto& marker : data["markers"]) {
+                new_song->add_marker(Marker(std::max(0.0, marker.at("timestamp").get<double>()), marker["name"]));
+            }
+        }
     } catch(...) {
         return nullptr;
     }
@@ -119,6 +126,18 @@ bool Song::save_to_file(const fs::path& path) {
         track["device"] = t.device_id;
         
         j["tracks"].push_back(track);
+    }
+
+    if(!markers.empty()) {
+        j["markers"] = json::array();
+
+        for(const auto& m : markers) {
+            json marker;
+            marker["timestamp"] = m.second.get_timestamp();
+            marker["name"] = m.second.get_name();
+
+            j["markers"].push_back(marker);
+        }
     }
 
     file << std::setw(4) << j << std::endl;
