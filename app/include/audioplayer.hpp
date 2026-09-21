@@ -46,7 +46,7 @@ public:
     int select_next_song_looped();
 
     // Markers
-    std::map<double, Marker> get_current_marker_layout();
+    std::vector<Marker> get_current_marker_layout();
     //
 
     bool is_playing();

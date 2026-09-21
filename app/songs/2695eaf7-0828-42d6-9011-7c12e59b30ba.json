@@ -23,12 +23,40 @@
 
     "markers" : [
         {
-            "timestamp" : 60.0,
-            "name" : "test"
+            "timestamp" : 40.0,
+            "name" : "Intro"
         },
         {
-            "timestamp" : 190.0,
-            "name" : "test2"
+            "timestamp" : 75.0,
+            "name" : "Strofa 1"
+        },
+        {
+            "timestamp" : 120.0,
+            "name" : "Chorus 1"
+        },
+        {
+            "timestamp" : 155.5,
+            "name" : "Strofa 2"
+        },
+        {
+            "timestamp" : 200.0,
+            "name" : "Chorus 2"
+        },
+        {
+            "timestamp" : 235.5,
+            "name" : "Special"
+        },
+        {
+            "timestamp" : 253.5,
+            "name" : "Strofa 3"
+        },
+        {
+            "timestamp" : 324.5,
+            "name" : "Final Chorus"
+        },
+        {
+            "timestamp" : 362.0,
+            "name" : "Outro"
         }
     ]
 }

@@ -471,8 +471,9 @@ void App::song_play_screen(Song* song) {
 
     std::string prossimo_brano = "---";
 
-    auto marker_layout = main_player.get_current_marker_layout();
+    std::vector<Marker> marker_layout = main_player.get_current_marker_layout(); // sorted
     std::string marker_line;
+    int current_marker_idx = -1;
 
 
     if (next_song) {
@@ -498,6 +499,34 @@ void App::song_play_screen(Song* song) {
         screen.ExitLoopClosure()();
     };
 
+    auto on_prev_marker = [&] {
+        if(marker_layout.empty()) return;
+
+        if(current_marker_idx < 0) {
+            main_player.set_playback_pos(marker_layout.back().get_timestamp() - 1.0f);
+            return;
+        };
+
+        if(current_marker_idx > 0) {
+            current_marker_idx--;
+            main_player.set_playback_pos(marker_layout[current_marker_idx].get_timestamp() - 1.0f);
+        } else {
+            main_player.set_playback_pos(0.0f);
+        }
+    };
+    auto on_next_marker = [&] {
+        if(marker_layout.empty()) return;
+        
+        if(progresso.first > marker_layout.back().get_timestamp()) {
+            main_player.set_playback_pos(progresso.second);
+            return;
+        }
+
+        if(current_marker_idx < 0) return;
+
+        main_player.set_playback_pos(marker_layout[current_marker_idx].get_timestamp());
+    };
+
     auto stile_bottone = [](const ui::EntryState& state) {
         ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 10);
 
@@ -514,10 +543,18 @@ void App::song_play_screen(Song* song) {
     auto btn_pause = ui::Button("⏸", on_pause, opzioni_bottone);
     auto btn_stop  = ui::Button("◼",  on_stop,  opzioni_bottone);
 
+    auto btn_prev_marker = ui::Button("<<<", on_prev_marker, opzioni_bottone);
+    auto btn_next_marker = ui::Button(">>>", on_next_marker, opzioni_bottone);
+
     auto pulsanti_riproduzione = ui::Container::Horizontal({
         btn_play,
         btn_pause,
         btn_stop,
+    });
+
+    auto pulsanti_marker = ui::Container::Horizontal({
+        btn_prev_marker,
+        btn_next_marker,
     });
 
     ui::SliderOption<double> opzioni_progresso;
@@ -618,6 +655,7 @@ void App::song_play_screen(Song* song) {
         seek_catcher,
         lista_bus_scrollabile,
         pulsanti_riproduzione,
+        pulsanti_marker,
     });
 
     auto build_marker_line = [&] {
@@ -635,11 +673,11 @@ void App::song_play_screen(Song* song) {
         marker_idx.push_back(-1);
 
         for(const auto& i : marker_layout) {
-            int idx = static_cast<int>(std::round(i.first * width));
+            int idx = static_cast<int>(std::floor((i.get_timestamp() / progresso.second) * width));
             buffer[idx] = '|';
 
             marker_idx.push_back(idx);
-            marker_names.push_back(i.second.get_name());
+            marker_names.push_back(i.get_name());
         }
 
         for(int i = 1; i < static_cast<int>(marker_idx.size()); i++) {
@@ -669,32 +707,24 @@ void App::song_play_screen(Song* song) {
         marker_line = buffer;
     };
 
-    // |                |                 |                  |         h
+    auto get_current_marker = [&] (double current_time) -> int {
+        if(marker_layout.empty()) return -1;
 
-    auto get_current_marker = [&] (double current_time) -> const Marker* {
-        if(marker_layout.empty()) return nullptr;
-
-        const Marker* least_of_leasts = nullptr;
-        double least_timestamp = INFINITY;
-
-        for(const auto& i : marker_layout) {
-            double timestamp = i.second.get_timestamp();
-            if(current_time <= timestamp) {
-                if(timestamp < least_timestamp) {
-                    least_timestamp = timestamp;
-                    least_of_leasts = &i.second;
-                }
+        for(int i = 0; i < static_cast<int>(marker_layout.size()); i++) {
+            if(current_time < marker_layout[i].get_timestamp()) {
+                return i;
             }
         }
 
-        return least_of_leasts;
+        return -1;
     };
 
     auto renderer = ui::Renderer(controlli, [&] {
+        if (!is_seeking) {
+            progresso = main_player.get_bus_playback_info(longest_bus);
+        }
+
         if (main_player.is_playing()) {
-            if (!is_seeking) {
-                progresso = main_player.get_bus_playback_info(longest_bus);
-            }
             ui::animation::RequestAnimationFrame();
         } else if (!main_player.is_paused()) {
             screen.ExitLoopClosure()();
@@ -702,8 +732,8 @@ void App::song_play_screen(Song* song) {
 
         if(!is_first_frame) build_marker_line();
 
-        const Marker* current_marker = get_current_marker(progresso.first);
-        std::string current_section_name = (current_marker) ? current_marker->get_name() : "---";
+        current_marker_idx = get_current_marker(progresso.first);
+        std::string current_section_name = (current_marker_idx >= 0) ? marker_layout[current_marker_idx].get_name() : "---";
 
         is_first_frame = false;
 
@@ -733,6 +763,16 @@ void App::song_play_screen(Song* song) {
                     btn_pause->Render(),
                     ui::text(" "),
                     btn_stop->Render(),
+                    ui::filler(),
+                }),
+
+                ui::separatorEmpty(),
+
+                ui::hbox({
+                    ui::filler(),
+                    btn_prev_marker->Render(),
+                    ui::text(" "),
+                    btn_next_marker->Render(),
                     ui::filler(),
                 }),
 

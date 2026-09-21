@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <chrono>
+#include <algorithm>
 
 
 
@@ -44,7 +45,7 @@ Song* AudioPlayer::get_current_song() const {
 
 // Markers
 
-std::map<double, Marker> AudioPlayer::get_current_marker_layout() {
+std::vector<Marker> AudioPlayer::get_current_marker_layout() {
     Song* current_song = get_current_song();
 
     if(!current_song) return {};
@@ -56,14 +57,18 @@ std::map<double, Marker> AudioPlayer::get_current_marker_layout() {
 
     auto song_duration_info = get_bus_playback_info(get_longest_bus_id());
 
-    std::map<double, Marker> ret;
+    std::vector<Marker> ret;
+
+    ret.reserve(markers.size());
 
     for(const auto& i : markers) {
-        if(i.second.get_timestamp() > song_duration_info.second) 
-            ret[song_duration_info.second] = i.second;
-        else
-            ret[i.second.get_timestamp() / song_duration_info.second] = i.second;
+        if(i.second.get_timestamp() > 0.0f && i.second.get_timestamp() <= song_duration_info.second)
+            ret.push_back(i.second);
     }
+
+    std::sort(ret.begin(), ret.end(), [](const Marker& a, const Marker& b) {
+        return a.get_timestamp() < b.get_timestamp();
+    });
 
     return ret;
 }
