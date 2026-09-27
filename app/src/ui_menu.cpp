@@ -93,7 +93,7 @@ void UIMenu::render(std::function<bool(ftxui::Event event)> callback, bool song_
                    ui::text(title) | ui::bold | ui::center,
                    ui::separatorEmpty(),
                    menu->Render() | ui::vscroll_indicator | ui::frame |
-                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 25),
                    ui::separatorEmpty(),
                    ui::separatorEmpty(),
                    back_button->Render(),

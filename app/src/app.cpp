@@ -741,7 +741,7 @@ void App::song_play_screen(Song* song) {
                 ui::text(titolo_brano) | ui::bold | ui::center,
                 ui::separatorEmpty(),
 
-                ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight),
+                ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight) | ui::color(ui::Color::Black),
                 seek_catcher->Render() | ui::reflect(slider_box),
 
                 ui::text(format_time_to_minutes(progresso.first) + " | " + format_time_to_minutes(progresso.second))
