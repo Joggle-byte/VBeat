@@ -8,7 +8,7 @@
 #include <iomanip>
 
 #define APP_NAME "VBeat"
-#define VBEAT_VERSION "0.0.1"
+#define VBEAT_VERSION "beta 0.0.1"
 
 #define ERROR_COL "\033[31m"
 #define WARNING "\033[33m"

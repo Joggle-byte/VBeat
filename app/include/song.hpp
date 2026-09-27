@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <filesystem>
 
 #include "audiotrack.hpp"
@@ -13,6 +14,22 @@ enum class SongState {
     OK,
     DEGRADED,
     CORRUPTED
+};
+
+
+class Marker {
+public:
+    Marker() {}
+    Marker(double timestamp, const std::string& _name) :
+        timestamp_seconds(timestamp),
+        name(_name) {}
+    
+    const std::string get_name() const { return name; }
+    double get_timestamp() const { return timestamp_seconds; }
+
+private:
+    double timestamp_seconds;
+    std::string name;
 };
 
 
@@ -35,11 +52,15 @@ public:
     void set_name(const std::string& new_name) { name = new_name; }
     void set_state(SongState new_state) { state = new_state; }
 
+    void add_marker(const Marker marker) { markers[marker.get_timestamp()] = marker; }
+
     const AudioTrack& get_track(int track_id);
     const std::vector<AudioTrack>& get_tracks() { return tracks; }
     const std::string& get_name() const;
     SongState get_state() const { return state; }
     TrackState get_track_state(int track_id) const;
+
+    const std::map<double, Marker>& get_markers() const { return markers; }
 
     bool is_corrupted() const { return state == SongState::CORRUPTED; }
     bool is_degraded() const { return state == SongState::DEGRADED; }
@@ -54,6 +75,8 @@ private:
     std::string name;
     std::vector<AudioTrack> tracks;
     SongState state;
+
+    std::map<double, Marker> markers;
 
     bool is_valid_track_id(int track_id) const;
 };
