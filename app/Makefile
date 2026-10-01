@@ -1,7 +1,7 @@
 CXX      = clang++
 CXXFLAGS = -std=c++17 -Wall -Iinclude
 LDFLAGS  = -Llib -L. -Wl,-rpath,@executable_path -framework AudioToolbox -framework CoreAudio -framework CoreFoundation
-LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen
+LDLIBS   = -lbass -lbassmix -lftxui-component -lftxui-dom -lftxui-screen
 
 # ASan: attiva con "make ASAN=1"
 ifeq ($(ASAN),1)
