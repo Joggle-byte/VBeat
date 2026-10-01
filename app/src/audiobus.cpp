@@ -24,7 +24,12 @@ bool AudioBus::generate_channel_map(int channel_idx, const int max_channels) {
     // if the selected channel idx is not available
     // it defaults to 0
 
+    if(!handle) return false;
+
     if(max_channels <= 1) return false;
+
+    BASS_CHANNELINFO info;
+    BASS_ChannelGetInfo(handle, &info);
 
     if(channel_idx < 0) channel_idx = 0;
 
@@ -39,7 +44,7 @@ bool AudioBus::generate_channel_map(int channel_idx, const int max_channels) {
     }
 
     matrix[channel_idx * 2] = 0;
-    matrix[channel_idx * 2 + 1] = 1;
+    matrix[channel_idx * 2 + 1] = (info.chans >= 2) ? 1 : 0; // mono -> 0; stereo -> 1
 
     track.channel_index = channel_idx;
 
