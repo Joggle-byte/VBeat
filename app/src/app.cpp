@@ -246,7 +246,7 @@ void App::main_loop() {
                 case 1:
                     song_queue_play_screen(song_bank.get_songs());
                     break;
-                case 2:
+                /*case 2:
                     song_creation();
                     break;
                 case 3:
@@ -257,7 +257,7 @@ void App::main_loop() {
                     break;
                 case 5:
                     playlist_editing();
-                    break;
+                    break;*/
                 case 6:
                     show_log();
                     break;
@@ -463,6 +463,11 @@ void App::song_play_screen(Song* song) {
 
     std::string titolo_brano = song->get_name();
 
+    std::string device_name = AudioPlayer::get_device_name_from_id(song->get_device_id());
+
+    if(device_name.empty())
+        device_name = "⚠ DEVICE UNAVAILABLE";
+
     std::pair<double, double> progresso(0.0f, 0.0f);
     int longest_bus = main_player.get_longest_bus_id();
 
@@ -588,6 +593,12 @@ void App::song_play_screen(Song* song) {
     });
 
 
+    auto get_channel_name_from_index = [] (int idx) -> std::string {
+        int first = idx * 2 + 1;
+        return std::to_string(first) + "-" + std::to_string(first + 1);
+    };
+
+
     int bus_scroll_offset = 0;
     ui::Box bus_list_box;
 
@@ -598,13 +609,10 @@ void App::song_play_screen(Song* song) {
             auto bus_levels = main_player.get_bus_levels();
 
             for (size_t i = 0; i < main_player.bus_count(); i++) {
-                AudioTrack track = main_player.get_bus(i)->get_track();
-                std::string bus_device_name;
+                const AudioTrack& track = main_player.get_bus(i)->get_track();
+                std::string bus_channel;
 
-                if (track.state == TrackState::DEVICE_MISSING)
-                    bus_device_name = "⚠ DEVICE UNAVAILABLE";
-                else
-                    bus_device_name = main_player.get_device_name_from_id(track.device_id);
+                bus_channel = get_channel_name_from_index(track.channel_index);
 
                 bus_rows.push_back(
                     ui::hbox({
@@ -615,7 +623,7 @@ void App::song_play_screen(Song* song) {
                             ui::separatorEmpty(),
                             ui::gauge(bus_levels[i].second) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
-                            ui::text("→ " + bus_device_name) | ui::size(ui::WIDTH, ui::EQUAL, 30)
+                            ui::text("→ " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 30)
                         }) | ui::flex,
                         ui::filler() | ui::flex
                     })
@@ -744,11 +752,16 @@ void App::song_play_screen(Song* song) {
                 ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight) | ui::color(ui::Color::Black),
                 seek_catcher->Render() | ui::reflect(slider_box),
 
+                ui::separatorEmpty(),
+
                 ui::text(format_time_to_minutes(progresso.first) + " | " + format_time_to_minutes(progresso.second))
-                    | ui::center | ui::dim,
+                    | ui::center,
 
                 ui::separatorEmpty(),
                 ui::text("Section: " + current_section_name) | ui::bold | ui::center | ui::color(ui::Color::GreenLight),
+
+                ui::separatorEmpty(),
+                ui::text("→ " + device_name) | ui::center | ui::dim,
 
                 ui::separator(),
 
@@ -795,6 +808,7 @@ struct UITrack {
     int device_index = 0;
 };
 
+/*
 void App::song_creation(Song* edit_song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
  
@@ -802,13 +816,23 @@ void App::song_creation(Song* edit_song) {
 
     if(edit_song) nome_canzone = edit_song->get_name();
  
-    std::vector<std::string> audio_devices_names = main_player.get_device_names();
-    std::vector<std::string> audio_devices_ids = main_player.get_device_ids();
+    std::vector<Device> audio_devices = main_player.get_devices();
+    std::vector<std::string> audio_devices_names;
+
+    for(const auto& i : audio_devices)
+        audio_devices_names.push_back(i.name);
  
     std::list<UITrack> tracce;
  
     auto container_tracce = ui::Container::Vertical({});
  
+    auto get_index_from_device = [&] (const std::string& dev) -> int {
+        for(const auto& i : audio_devices) {
+            if(i.id == dev) return i.session_index;
+        }
+        return -1;
+    };
+
     auto crea_ui_traccia = [&](std::list<UITrack>::iterator it) -> ui::Component {
         UITrack& stato = *it;
 
@@ -825,7 +849,7 @@ void App::song_creation(Song* edit_song) {
         auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
  
         
-        stato.device_index = AudioBus::find_device_by_driver(stato.data.device_id);
+        stato.device_index = get_index_from_device(stato.data.device_id);
 
         auto dropdown_device = ui::Dropdown(&audio_devices_names, &stato.device_index);
  
@@ -909,7 +933,7 @@ void App::song_creation(Song* edit_song) {
         new_song->set_name(nome_canzone);
 
         for(auto& t : tracce) {
-            t.data.device_id = audio_devices_ids[t.device_index];
+            t.data.device_id = audio_devices[t.device_index].id;
             new_song->add_track(t.data);
         }
             
@@ -955,13 +979,6 @@ void App::song_creation(Song* edit_song) {
         container_tracce,
         bottoni_finali,
     });
-    
-    auto get_index_from_device = [&] (const std::string& dev) -> int {
-        for(int i = 0; i < static_cast<int>(audio_devices_ids.size()); i++) {
-            if(audio_devices_ids[i] == dev) return i;
-        }
-        return -1;
-    };
 
     if(edit_song) {
         for(auto& t : edit_song->get_tracks()) {
@@ -1306,3 +1323,5 @@ void App::playlist_editing() {
         return false;
     });
 }
+
+*/

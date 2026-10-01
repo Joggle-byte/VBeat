@@ -1,7 +1,7 @@
 CXX      = g++
 CXXFLAGS = -std=c++17 -Wall -Iinclude
 LDFLAGS  = -Llib
-LDLIBS   = -lbass -lftxui-component -lftxui-dom -lftxui-screen -pthread
+LDLIBS   = -lbass -lbassmix -lftxui-component -lftxui-dom -lftxui-screen -pthread
 
 # Directories
 SRC_DIR  = src

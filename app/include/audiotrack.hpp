@@ -6,10 +6,8 @@
 enum class TrackState {
     INVALID_TRACK,
     OK,
-    DEVICE_MISSING,
     FILE_MISSING,
     FILE_UNREADABLE,
-    FILE_AND_DEVICE_MISSING
 };
 
 
@@ -17,7 +15,7 @@ struct AudioTrack {
     std::string name;
     std::string file_path;
     float volume = 1.0;
-    std::string device_id;
+    int channel_index = 0;
 
     TrackState state;
 };
