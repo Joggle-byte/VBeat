@@ -1,7 +1,7 @@
 #include "../include/resource_validator.hpp"
 #include "../include/logger.hpp"
 #include "../include/bass.h"
-#include "../include/audiobus.hpp"
+#include "../include/audioplayer.hpp"
 
 #include <filesystem>
 
@@ -23,14 +23,6 @@ void ResourceValidator::validate(Song* res) {
     for(size_t i = 0; i < res->get_tracks_count(); i++) {
         const AudioTrack& t = res->get_track(i);
 
-        if(!is_device_available(AudioBus::find_device_by_driver(t.device_id))) {
-            if(!fs::exists(fs::path(t.file_path))) {
-                res->set_track_state(i, TrackState::FILE_AND_DEVICE_MISSING);
-            } else res->set_track_state(i, TrackState::DEVICE_MISSING);
-
-            continue;
-        }
-
         if(!fs::exists(fs::path(t.file_path))) {
             res->set_track_state(i, TrackState::FILE_MISSING);
         } else res->set_track_state(i, TrackState::OK);
@@ -46,20 +38,17 @@ void ResourceValidator::validate(Song* res) {
             case TrackState::OK:
                 corrupted_flag = false;
                 break;
-            case TrackState::DEVICE_MISSING:
-                degraded_flag = true;
-                Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' is routed to an unavailable device: " + t.device_id);
-                break;
             case TrackState::FILE_MISSING:
                 degraded_flag = true;
                 Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' points to an unavailable audio file: " + t.file_path);
                 break;
-            case TrackState::FILE_AND_DEVICE_MISSING:
-                degraded_flag = true;
-                Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' is routed to an unavailable device: " + t.device_id);
-                Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") Track '" + t.name + "' points to an unavailable audio file: " + t.file_path);
-                break;
         }
+    }
+
+    if(!is_device_available(AudioPlayer::get_device_index_by_id(res->get_device_id()))) {
+        Logger::get_instance().log_warn("[SongValidator] (in song: " + res->get_name() + ") the song is routed to an unavailable device: " + res->get_device_id());
+        
+        corrupted_flag = true;
     }
 
     if(corrupted_flag) {

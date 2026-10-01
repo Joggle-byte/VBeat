@@ -1,7 +1,9 @@
 #pragma once
 
 #include "bass.h"
+#include "bassmix.h"
 #include "audiotrack.hpp"
+
 #include <string>
 
 
@@ -13,17 +15,12 @@ public:
 
     bool load(const AudioTrack& new_track, bool verbose = true);
 
-    bool route_to_device(const std::string& new_device);
-
-    void play(bool restart);
-    void prepare_for_play();
-    void pause();
-    void stop();
+    bool route_bus();
 
     void set_volume(float vol);
 
     bool is_playing();
-    bool is_paused();
+
     bool is_stopped();
 
     void free();
@@ -34,20 +31,20 @@ public:
 
     std::pair<float, float> get_stereo_audio_levels() const;
 
-    static int find_device_by_driver(const std::string& target_driver);
-
     HSTREAM get_handle() const { return handle; }
-    std::string get_device() const { return track.device_id; }
-    const std::string& get_file_path() const { return file_path; }
+
+    int get_channel_index() const { return track.channel_index; }
+
     AudioTrack get_track() const { return track; }
 
 private:
     AudioTrack track;
 
     HSTREAM handle = 0;
-    std::string file_path;
+
+    std::vector<int> device_channel_map;
 
     bool has_finished_playing = false;
 
-    int init_device(const std::string& id, bool verbose);
+    bool generate_channel_map(const int channel_idx, const int max_channels);
 };

@@ -45,9 +45,9 @@ void Song::set_track_name(int track_id, const std::string& new_name) {
         tracks[track_id].name = new_name;
 }
 
-void Song::set_track_device(int track_id, const std::string& device) {
+void Song::set_track_channel(int track_id, const int channel) {
     if (is_valid_track_id(track_id))
-        tracks[track_id].device_id = device;
+        tracks[track_id].channel_index = channel;
 }
     
 void Song::set_track_state(int track_id, TrackState state) {
@@ -83,13 +83,14 @@ Song* Song::create_from_file(const fs::path& path) {
 
     try {
         new_song->name = data["name"];
+        new_song->device_id = data["device"];
 
         for(const auto& track : data["tracks"]) {
             new_song->add_track({
                 track["name"],
                 track["path"],
                 track["volume"],
-                track["device"]
+                track["channel"]
             });
         }
 
@@ -116,6 +117,7 @@ bool Song::save_to_file(const fs::path& path) {
     json j;
 
     j["name"] = name;
+    j["device"] = device_id;
     j["tracks"] = json::array();
 
     for(const auto& t : tracks) {
@@ -123,7 +125,7 @@ bool Song::save_to_file(const fs::path& path) {
         track["name"] = t.name;
         track["path"] = t.file_path;
         track["volume"] = t.volume;
-        track["device"] = t.device_id;
+        track["channel"] = t.channel_index;
         
         j["tracks"].push_back(track);
     }

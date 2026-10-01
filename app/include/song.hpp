@@ -46,7 +46,7 @@ public:
     void set_track_volume(int track_id, float vol);
     void set_track_filepath(int track_id, const std::string& path);
     void set_track_name(int track_id, const std::string& new_name);
-    void set_track_device(int track_id, const std::string& device);
+    void set_track_channel(int track_id, const int channel);
     void set_track_state(int track_id, TrackState state);
 
     void set_name(const std::string& new_name) { name = new_name; }
@@ -55,6 +55,7 @@ public:
     void add_marker(const Marker marker) { markers[marker.get_timestamp()] = marker; }
 
     const AudioTrack& get_track(int track_id);
+    const std::string& get_device_id() const { return device_id; } 
     const std::vector<AudioTrack>& get_tracks() { return tracks; }
     const std::string& get_name() const;
     SongState get_state() const { return state; }
@@ -74,6 +75,7 @@ public:
 private:
     std::string name;
     std::vector<AudioTrack> tracks;
+    std::string device_id;
     SongState state;
 
     std::map<double, Marker> markers;

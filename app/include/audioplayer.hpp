@@ -1,15 +1,19 @@
 #pragma once
 
 #include <vector>
-#include <functional>
-#include <thread>
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
+#include <unordered_map>
 
 #include "audiobus.hpp"
 #include "song.hpp"
 #include "playlist.hpp"
+
+
+struct Device {
+    std::string name;
+    std::string id;
+
+    int session_index = -1;
+};
 
 
 class AudioPlayer {
@@ -19,13 +23,20 @@ public:
     ~AudioPlayer();
 
     void list_devices();
-    void list_song_queue();
 
+    std::vector<Device> get_devices();
+
+    static std::string get_device_name_from_id(const std::string& id);
+
+    static int get_device_index_by_id(const std::string& target_driver);
+
+    /*
     std::vector<std::string> get_device_names() const;
     std::vector<std::string> get_device_ids() const;
 
     std::string get_device_id_from_index(int index) const;
     std::string get_device_name_from_id(const std::string& id) const;
+    */
 
     void queue_song(Song* song);
     void set_queue(std::vector<Song*> new_queue);
@@ -34,7 +45,6 @@ public:
 
     void play(int song_id);
     void play_current();
-    void play_queue();
 
     void pause();
     void stop();
@@ -73,14 +83,20 @@ public:
     std::pair<double, double> get_bus_playback_info(int bus_id);
 
 private:
+    std::unordered_map<std::string, int> active_devices; // device id -> device index
+
     int playing_song;
     std::vector<Song*> queued_songs;
+
     std::vector<AudioBus> busses;
+
+    HSTREAM mixer = 0;
 
     bool paused = false;
     bool should_restart = false;
 
-    void process_playing();
+    int acquire_device(const std::string& id);
+    void release_all_devices();
 
     bool is_valid_bus(int id) const;
     bool is_valid_song_id(int id) const;
@@ -90,22 +106,7 @@ private:
 
     bool load_song(Song* new_song, bool verbose = true);
 
-    void swap_buffers();
-
-    bool route_channel(int bus_id, const std::string& new_device);
-
     void set_volume(int bus_id, float vol);
 
-    /* SONG PRELOADER */
-    std::vector<AudioBus> bus_buffer;
-    
-    /*
-    std::thread worker;
-    std::atomic<bool> stop_flag;
-    std::mutex mtx;
 
-    void stop_preloader();
-    void preload_next_song(const Song* next_song, float progress_ratio);
-    void threaded_load(int longest_bus_id, const Song* next_song, float progress_ratio);
-    */
 };
