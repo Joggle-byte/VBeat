@@ -246,7 +246,7 @@ void App::main_loop() {
                 case 1:
                     song_queue_play_screen(song_bank.get_songs());
                     break;
-                /*case 2:
+                case 2:
                     song_creation();
                     break;
                 case 3:
@@ -257,7 +257,7 @@ void App::main_loop() {
                     break;
                 case 5:
                     playlist_editing();
-                    break;*/
+                    break;
                 case 6:
                     show_log();
                     break;
@@ -805,33 +805,61 @@ void App::song_play_screen(Song* song) {
 
 struct UITrack {
     AudioTrack data;
-    int device_index = 0;
+    int output_index = 0;   // indice della coppia di canali (0 -> "1-2", ecc.)
 };
 
-/*
 void App::song_creation(Song* edit_song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
- 
-    std::string nome_canzone;
 
-    if(edit_song) nome_canzone = edit_song->get_name();
- 
+    std::string nome_canzone;
+    if (edit_song) nome_canzone = edit_song->get_name();
+
     std::vector<Device> audio_devices = main_player.get_devices();
     std::vector<std::string> audio_devices_names;
 
-    for(const auto& i : audio_devices)
+    for (const auto& i : audio_devices)
         audio_devices_names.push_back(i.name);
- 
-    std::list<UITrack> tracce;
- 
-    auto container_tracce = ui::Container::Vertical({});
- 
-    auto get_index_from_device = [&] (const std::string& dev) -> int {
-        for(const auto& i : audio_devices) {
-            if(i.id == dev) return i.session_index;
+
+    auto get_index_from_device = [&](const std::string& dev) -> int {
+        for (size_t idx = 0; idx < audio_devices.size(); idx++) {
+            if (audio_devices[idx].id == dev) return (int)idx;
         }
-        return -1;
+        return 0;
     };
+
+    int device_index = 0;
+    if (edit_song) device_index = get_index_from_device(edit_song->get_device_id());
+
+    auto dropdown_device_canzone = ui::Dropdown(&audio_devices_names, &device_index);
+
+    std::vector<std::string> uscita_labels;
+
+    auto ricalcola_uscite = [&] {
+        uscita_labels.clear();
+
+        if (device_index < 0 || device_index >= (int)audio_devices.size())
+            return;
+
+        int uscite_stereo = main_player.get_device_audio_out_count(audio_devices[device_index].id);
+
+        if (uscite_stereo <= 0) {
+            uscita_labels.push_back("N/A");
+            return;
+        }
+
+        for (int i = 0; i < uscite_stereo; i++) {
+            int canale_sinistro = i * 2 + 1;
+            int canale_destro = i * 2 + 2;
+            uscita_labels.push_back(std::to_string(canale_sinistro) + "-" + std::to_string(canale_destro));
+        }
+    };
+
+    int ultimo_device_index = device_index;
+
+    ricalcola_uscite();
+
+    std::list<UITrack> tracce;
+    auto container_tracce = ui::Container::Vertical({});
 
     auto crea_ui_traccia = [&](std::list<UITrack>::iterator it) -> ui::Component {
         UITrack& stato = *it;
@@ -843,69 +871,66 @@ void App::song_creation(Song* edit_song) {
         opzioni_volume.min = 0.0f;
         opzioni_volume.max = 2.0f;
         opzioni_volume.increment = 0.05f;
-
         auto slider_volume = ui::Slider<float>(opzioni_volume);
 
         auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
- 
-        
-        stato.device_index = get_index_from_device(stato.data.device_id);
 
-        auto dropdown_device = ui::Dropdown(&audio_devices_names, &stato.device_index);
- 
-        //DELETE BUTTON
+        // Dropdown dell'USCITA (non più del device): referenzia la lista
+        // condivisa `uscita_labels`, che viene rigenerata ogni frame.
+        auto dropdown_uscita = ui::Dropdown(&uscita_labels, &stato.output_index);
+
+        // --- DELETE BUTTON (invariato) -----------------------------------
         auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
- 
+
         auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &tracce] {
             if (auto self = self_weak_box->lock())
                 self->Detach();
             tracce.erase(it);
         });
- 
-        
+
         auto gruppo = ui::Container::Vertical({
             input_nome,
             input_percorso,
             slider_volume,
-            dropdown_device,
+            dropdown_uscita,
             btn_elimina
         });
 
         ui::Component componente = ui::Renderer(gruppo, [&stato, input_nome, slider_volume,
-                                                   input_percorso, dropdown_device,
+                                                   input_percorso, dropdown_uscita,
                                                    btn_elimina] {
             return ui::vbox({
                        ui::hbox(ui::text("Name:    ") | ui::dim, input_nome->Render()),
                        ui::hbox(ui::text("Volume:  ") | ui::dim, slider_volume->Render() | ui::flex,
                             ui::text(" " + std::to_string(stato.data.volume))),
                        ui::hbox(ui::text("File:    ") | ui::dim, input_percorso->Render()),
-                       ui::hbox(ui::text("Device:  ") | ui::dim, dropdown_device->Render()),
+                       ui::hbox(ui::text("Output:  ") | ui::dim, dropdown_uscita->Render()),
                        ui::separator(),
                        btn_elimina->Render(),
                    }) |
                    ui::border;
         });
- 
+
         *self_weak_box = componente;
         return componente;
     };
- 
+
     auto on_aggiungi_click = [&] {
         tracce.emplace_back();
         auto it = std::prev(tracce.end());
         container_tracce->Add(crea_ui_traccia(it));
     };
- 
+
     auto btn_aggiungi = ui::Button("+ Add Track", on_aggiungi_click);
- 
+
     auto input_nome_canzone = ui::Input(&nome_canzone, "Song name...");
- 
+
     auto on_salva_click = [&] {
-        if(tracce.empty() || nome_canzone.empty()) return;
-        
-        if(song_bank.song_exists_by_name(nome_canzone)) {
-            if(edit_song) {
-                if(edit_song->get_name() != nome_canzone) {
+        if (tracce.empty() || nome_canzone.empty()) return;
+
+        if (song_bank.song_exists_by_name(nome_canzone)) {
+            if (edit_song) {
+                if (edit_song->get_name() != nome_canzone) {
                     Logger::get_instance().log_err("[SongEditor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
                     return;
                 }
@@ -917,38 +942,39 @@ void App::song_creation(Song* edit_song) {
 
         std::string song_uid;
         Song* new_song;
-        
-        if(edit_song) {
+
+        if (edit_song) {
             new_song = edit_song;
             song_uid = song_bank.get_song_uid(edit_song);
-
             edit_song->clear_tracks();
         } else {
             std::pair<std::string, Song*> song_and_uid = song_bank.create_song();
-
             new_song = song_and_uid.second;
             song_uid = song_and_uid.first;
         }
-        
+
         new_song->set_name(nome_canzone);
 
-        for(auto& t : tracce) {
-            t.data.device_id = audio_devices[t.device_index].id;
+        if (device_index >= 0 && device_index < (int)audio_devices.size())
+            new_song->set_device_id(audio_devices[device_index].id);
+
+        for (auto& t : tracce) {
+            t.data.channel_index = t.output_index;
             new_song->add_track(t.data);
         }
-            
-        if(!song_bank.save_song_to_file(song_uid))
+
+        if (!song_bank.save_song_to_file(song_uid))
             Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
         else
             Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
 
         screen.ExitLoopClosure()();
     };
- 
+
     auto on_annulla_click = [&] {
         screen.ExitLoopClosure()();
     };
- 
+
     ui::ButtonOption stile_salva;
     stile_salva.transform = [](const ui::EntryState& state) {
         ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
@@ -956,7 +982,7 @@ void App::song_creation(Song* edit_song) {
             e = e | ui::bgcolor(ui::Color::Green) | ui::color(ui::Color::White);
         return e | ui::border;
     };
- 
+
     ui::ButtonOption stile_annulla;
     stile_annulla.transform = [](const ui::EntryState& state) {
         ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
@@ -964,59 +990,69 @@ void App::song_creation(Song* edit_song) {
             e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
         return e | ui::border;
     };
- 
+
     auto btn_salva = ui::Button("Save and Back", on_salva_click, stile_salva);
     auto btn_annulla = ui::Button("Cancel", on_annulla_click, stile_annulla);
- 
+
     auto bottoni_finali = ui::Container::Horizontal({
         btn_salva,
         btn_annulla,
     });
- 
+
     auto layout_principale = ui::Container::Vertical({
         input_nome_canzone,
+        dropdown_device_canzone,   // <-- nuovo: dropdown device a livello canzone
         btn_aggiungi,
         container_tracce,
         bottoni_finali,
     });
 
-    if(edit_song) {
-        for(auto& t : edit_song->get_tracks()) {
+    if (edit_song) {
+        for (auto& t : edit_song->get_tracks()) {
             on_aggiungi_click();
             UITrack& new_track = tracce.back();
             new_track.data = t;
-
-            int idx = get_index_from_device(t.device_id);
-            new_track.device_index = (idx >= 0) ? idx : 0;
+            new_track.output_index = t.channel_index;
         }
     }
 
     auto renderer = ui::Renderer(layout_principale, [&] {
+        if (device_index != ultimo_device_index) {
+            ricalcola_uscite();
+            ultimo_device_index = device_index;
+
+            for (auto& t : tracce) {
+                if (t.output_index >= (int)uscita_labels.size())
+                    t.output_index = 0;
+            }
+        }
+
         return ui::vbox({
                    ui::text("Create New Song") | ui::bold | ui::center,
                    ui::separator(),
- 
+
                    ui::hbox(ui::text("Song Name: ") | ui::dim, input_nome_canzone->Render()),
- 
+                   ui::hbox(ui::text("Device:    ") | ui::dim, dropdown_device_canzone->Render()),
+
                    ui::separator(),
- 
+
                    ui::hbox({
                        ui::text("Tracks") | ui::bold,
                        ui::filler(),
                        btn_aggiungi->Render(),
                    }),
                    ui::separator(),
- 
+
                    container_tracce->Render() | ui::vscroll_indicator | ui::frame |
                        ui::size(ui::HEIGHT, ui::LESS_THAN, 25),
- 
+
                    ui::separator(),
                    bottoni_finali->Render() | ui::center,
                }) |
                ui::size(ui::WIDTH, ui::GREATER_THAN, 60) |
                ui::border;
     });
- 
+
     screen.Loop(renderer);
 }
 
@@ -1323,5 +1359,3 @@ void App::playlist_editing() {
         return false;
     });
 }
-
-*/

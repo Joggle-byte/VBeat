@@ -4,6 +4,7 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <cmath>
 
 
 
@@ -38,6 +39,19 @@ std::string AudioPlayer::get_device_name_from_id(const std::string& id) {
             return info.name;
     }
     return "";
+}
+
+size_t AudioPlayer::get_device_audio_out_count(const std::string& id) {
+    int idx = acquire_device(id);
+
+    if(!BASS_SetDevice(idx)) {
+        return 0;
+    }
+
+    BASS_INFO info;
+    BASS_GetInfo(&info);
+
+    return std::floor(info.speakers / 2);
 }
 
 int AudioPlayer::acquire_device(const std::string& id) {

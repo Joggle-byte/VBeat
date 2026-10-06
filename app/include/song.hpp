@@ -51,6 +51,7 @@ public:
 
     void set_name(const std::string& new_name) { name = new_name; }
     void set_state(SongState new_state) { state = new_state; }
+    void set_device_id(const std::string& id) { device_id = id; }
 
     void add_marker(const Marker marker) { markers[marker.get_timestamp()] = marker; }
 
