@@ -30,6 +30,8 @@ public:
 
     static int get_device_index_by_id(const std::string& target_driver);
 
+    size_t get_device_audio_out_count(const std::string& id);
+
     /*
     std::vector<std::string> get_device_names() const;
     std::vector<std::string> get_device_ids() const;

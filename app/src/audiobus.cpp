@@ -31,11 +31,17 @@ bool AudioBus::generate_channel_map(int channel_idx, const int max_channels) {
     BASS_CHANNELINFO info;
     BASS_ChannelGetInfo(handle, &info);
 
-    if(channel_idx < 0) channel_idx = 0;
+    if(channel_idx < 0) {
+        Logger::get_instance().log_warn("[AudioBus " + track.name + "] invalid channel index : " + std::to_string(channel_idx) + ".\n        Audio channel will be set to default (0). Audio device channel count : " + std::to_string(max_channels));
+        channel_idx = 0;
+    }
 
     int effective_channels = std::floor(max_channels / 2);
 
-    if(channel_idx >= effective_channels) channel_idx = 0;
+    if(channel_idx >= effective_channels) {
+        Logger::get_instance().log_warn("[AudioBus " + track.name + "] invalid channel index : " + std::to_string(channel_idx) + ".\n        Audio channel will be set to default (0). Audio device channel count : " + std::to_string(max_channels));
+        channel_idx = 0;
+    }
 
     std::vector<int> matrix(max_channels);
 
