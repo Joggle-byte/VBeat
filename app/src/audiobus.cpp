@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #include "../include/audiobus.hpp"
 #include "../include/logger.hpp"
@@ -155,7 +156,10 @@ std::pair<float, float> AudioBus::get_stereo_audio_levels() const {
     float levels[2] = {0.0f, 0.0f};
 
     if (BASS_Mixer_ChannelGetLevelEx(handle, levels, 0.02f, BASS_LEVEL_STEREO)) {
-        return {levels[0], levels[1]};
+        return {
+            std::clamp(levels[0] * track.volume, 0.0f, 1.0f), 
+            std::clamp(levels[1] * track.volume, 0.0f, 1.0f)
+        };
     }
     
     return {0.0f, 0.0f};

@@ -123,6 +123,27 @@ Playlist* App::get_playlist(const std::string& uid) {
     return nullptr;
 }
 
+void App::delete_playlist(const std::string& uid) {
+    auto play = get_playlist(uid);
+
+    if(!play) return;
+
+    delete play;
+
+    auto play_path = get_playlist_path(uid);
+
+    playlists.erase(playlists.find(uid));
+
+    if(fs::remove(play_path))
+        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_path.string() + "'");
+    else 
+        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_path.string() + "'");
+}
+
+void App::delete_playlist(Playlist* play) {
+
+}
+
 void App::clear_playlists() {
     for(const auto& i : playlists)
         delete i.second;
@@ -233,7 +254,9 @@ bool App::wipe_memory() {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", "🗘 Reload Songs & Playlists", "$⚠ Wipe Memory"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", 
+        "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "🗎 View Log", 
+        "🗘 Reload Songs & Playlists", "$⚠ Delete Song", "$⚠ Delete Playlist", "$⚠ Wipe Memory"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -269,6 +292,12 @@ void App::main_loop() {
                     load_all_playlists(playlist_bank_path);
                     break;
                 case 8:
+                    song_delete();
+                    break;
+                case 9:
+                    playlist_delete();
+                    break;
+                case 10:
                     if(confirm_dialog("Are you sure you want to wipe\nall saved songs and playlists?"))
                         wipe_memory();
                     break;
@@ -1098,6 +1127,43 @@ void App::song_editing() {
     }, true);
 }
 
+void App::song_delete() {
+    std::vector<Song*> songs = song_bank.get_songs();
+
+    if(songs.empty()) return;
+
+    std::vector<std::string> options;
+
+    auto load_songs = [&] {
+        options.clear();
+
+        for(const auto s : songs) {
+            options.push_back(s->get_name());
+        }
+    };
+    
+    load_songs();
+
+    UIMenu menu("Select the song to delete", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            
+            Song* song = songs[menu.get_selected_id()];
+
+            if(confirm_dialog("Are you sure you want to delete\nthe song '" + song->get_name() + "' ?")) {
+                song_bank.delete_song(song);
+                load_songs();
+            }
+
+            return true;
+        }
+        return false;
+    }, true);
+}
+
 
 struct PlaylistEntryUI {
     Song* canzone;
@@ -1353,6 +1419,43 @@ void App::playlist_editing() {
             playlist_creation(playlists[menu.get_selected_id()]);
             load_playlists();
             menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    });
+}
+
+void App::playlist_delete() {
+    std::vector<Playlist*> playlists = get_playlists();
+
+    if(playlists.empty()) return;
+
+    std::vector<std::string> options;
+
+    auto load_playlists = [&] {
+        options.clear();
+
+        for(const auto s : playlists) {
+            options.push_back(s->get_name());
+        }
+    };
+    
+    load_playlists();
+
+    UIMenu menu("Select the playlist to delete", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            
+            Playlist* play = playlists[menu.get_selected_id()];
+
+            if(confirm_dialog("Are you sure you want to delete\nthe playlist '" + play->get_name() + "' ?")) {
+                delete_playlist(play);
+                load_playlists();
+            }
 
             return true;
         }

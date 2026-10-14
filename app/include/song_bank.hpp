@@ -22,6 +22,9 @@ public:
 
     bool save_song_to_file(const std::string& uid);
 
+    void delete_song(const std::string& uid);
+    void delete_song(Song* song);
+
     void append_new(Song* s);
 
     Song* get_song(const std::string& uid);

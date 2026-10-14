@@ -40,6 +40,9 @@ private:
 
     std::pair<std::string, Playlist*> create_playlist();
 
+    void delete_playlist(const std::string& uid);
+    void delete_playlist(Playlist* play);
+
     bool save_playlist_to_file(const std::string& uid);
 
     Playlist* get_playlist(const std::string& uid);
@@ -71,9 +74,11 @@ private:
     void playlist_selection();
     void playlist_creation(Playlist* edit_playlist = nullptr);
     void playlist_editing();
+    void playlist_delete();
 
     void song_creation(Song* song = nullptr);
     void song_editing();
+    void song_delete();
 
     void song_selection();
 
