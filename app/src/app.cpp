@@ -1,11 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
-#include <thread>
-#include <chrono>
+#include <cctype>
+#include <cstdio>
+#include <memory>
+#include <utility>
 #include <algorithm>
 
-//TEMP
 #include <list>
 
 #include "../include/app.hpp"
@@ -20,21 +21,23 @@ using json = nlohmann::json;
 
 App::~App() {
     song_bank.clear();
-    clear_playlists();
+    play_bank.clear();
 }
 
 int App::main() {
     std::system("clear && printf '\e[3J'");
 
     Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
-    Logger::get_instance().log("====== Startup Log ======");
+    Logger::get_instance().log("============= Startup Log =============");
 
-    if (!load_config_file()) return 1;
+    auto config = load_config_file();
 
-    song_bank.load_all(song_bank_path);
-    load_all_playlists(playlist_bank_path);
+    if(config.failed) return 1;
 
-    Logger::get_instance().log("=========================\n");
+    song_bank.load_all(config.song_bank_path);
+    play_bank.load_all(config.play_bank_path, &song_bank);
+
+    Logger::get_instance().log("=====================================\n");
 
     main_player.list_devices();
 
@@ -63,7 +66,7 @@ std::string make_default_config_file(fs::path dir) {
     return p;
 }
 
-bool App::load_config_file() {
+ConfigFile App::load_config_file() {
     fs::path dir = getAppSupportDir(APP_NAME);
 
     fs::create_directories(dir);
@@ -85,146 +88,29 @@ bool App::load_config_file() {
 
     std::ifstream file(dir / "config.json");
 
+    ConfigFile ret;
+
     if (!file.is_open()) {
         std::cout << "[VBeat] unable to load config file. Exiting...";
-        return false;
+        ret.failed = true;
+        return ret;
     }
 
     json config;
 
     try {
         file >> config;
-        song_bank_path = config.at("song_bank_path").get<std::string>();
-        playlist_bank_path = config.at("playlist_bank_path").get<std::string>();
+
+        ret.song_bank_path = config.at("song_bank_path").get<std::string>();
+        ret.play_bank_path = config.at("playlist_bank_path").get<std::string>();
+
         Logger::get_instance().set_log_file_dir(config.at("log_file_dir").get<std::string>());
     } catch (const std::exception& e) {
         Logger::get_instance().log_err(
             std::string("[VBeat] unable to parse config file: ") + e.what()
         );
-        return false;
-    }
-
-    return true;
-}
-
-void App::load_all_playlists(const std::string& bank_path) {
-    std::vector<fs::path> all = get_files_by_extension(fs::path(bank_path), ".json");
-
-    for(const auto& p : all) {
-        Playlist* playlist = Playlist::create_from_file(p);
-
-        if(!playlist) {
-            Logger::get_instance().log_err("[Playlist Bank] unable to load playlist '" + p.string() + "'");
-            return;
-        }
-        
-        std::vector<std::string> songs = playlist->get_songs();
-
-        for(size_t i = 0; i < songs.size(); i++) {
-            if(!song_bank.song_exists(songs[i])) {
-                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with uid '" + songs[i] + "' doesn't exist in song bank");
-                playlist->remove_song(i);
-            }
-        }
-
-        playlists[p.stem().string()] = playlist;
-    }
-
-    if(playlists.empty())
-        Logger::get_instance().log_warn("[Playlist Bank] playlist bank is empty!");
-    else
-        Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
-}
-
-std::pair<std::string, Playlist*> App::create_playlist() {
-    Playlist* p = new Playlist();
-
-    std::string uid = generate_uuid_v4();
-
-    playlists[uid] = p;
-
-    return std::pair<std::string, Playlist*>(uid, p);
-}
-
-bool App::save_playlist_to_file(const std::string& uid) {
-    Playlist* playlist = get_playlist(uid);
-
-    if(!playlist) return false;
-
-    return playlist->save_to_file(get_playlist_path(uid));
-}
-
-Playlist* App::get_playlist(const std::string& uid) {
-    auto it = playlists.find(uid);
-    if (it != playlists.end()) return it->second;
-
-    return nullptr;
-}
-
-void App::clear_playlists() {
-    for(const auto& i : playlists)
-        delete i.second;
-    
-    playlists.clear();
-}
-
-bool App::playlist_exists(const std::string& name) const {
-    for(const auto& p : playlists) {
-        if(p.second->get_name() == name) return true;
-    }
-
-    return false;
-}
-
-std::vector<Playlist*> App::get_playlists() {
-    std::vector<Playlist*> ret;
-
-    for(const auto& p : playlists) {
-        ret.push_back(p.second);
-    }
-
-    return ret;
-}
-
-fs::path App::get_playlist_path(Playlist* playlist) const {
-    auto it = std::find_if(playlists.begin(), playlists.end(), 
-        [&playlist](const auto& pair) {
-            return pair.second == playlist;
-        });
-
-    if (it != playlists.end()) {
-        return fs::path(playlist_bank_path) / fs::path(it->first + ".json");
-    } else return fs::path();
-}
-
-fs::path App::get_playlist_path(const std::string& uid) const {
-    auto it = playlists.find(uid);
-
-    if(it != playlists.end())
-        return fs::path(playlist_bank_path) / fs::path(uid + ".json");
-    
-    return fs::path();
-}
-
-const std::string App::get_playlist_uid(Playlist* playlist) const {
-    auto it = std::find_if(playlists.begin(), playlists.end(), 
-        [&playlist](const auto& pair) {
-            return pair.second == playlist;
-        });
-
-    if (it != playlists.end()) {
-        return it->first;
-    } else return "";
-}
-
-std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
-    std::vector<Song*> ret;
-
-    for(const auto& s : playlist->get_songs()) {
-        Song* song = song_bank.get_song(s);
-
-        if(song)
-            ret.push_back(song);
+        ret.failed = true;
+        return ret;
     }
 
     return ret;
@@ -271,7 +157,9 @@ bool App::wipe_memory() {
 
 
 void App::main_loop() {
-    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "View Log", "Reload Songs & Playlists", "$⚠ Wipe Memory"}, [&] {
+    UIMenu menu("VBeat Menu", {"Select Playlist", "Select Song", "+ Create Song", 
+        "+ Create Playlist", "✎ Edit Song", "✎ Edit Playlist", "✎ Edit Song Markers", "View Log", 
+        "Reload Songs & Playlists", "$⚠ Delete Song", "$⚠ Delete Playlist", "$⚠ Wipe Memory"}, [&] {
         menu.get_screen().ExitLoopClosure()();
     });
 
@@ -297,16 +185,23 @@ void App::main_loop() {
                     playlist_editing();
                     break;
                 case 6:
-                    show_log();
+                    marker_editing_selection();
                     break;
                 case 7:
-                    Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
-                    clear_playlists();
-                    song_bank.clear();
-                    song_bank.load_all(song_bank_path);
-                    load_all_playlists(playlist_bank_path);
+                    show_log();
                     break;
                 case 8:
+                    Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
+                    song_bank.reload_all();
+                    play_bank.reload_all(&song_bank);
+                    break;
+                case 9:
+                    song_delete();
+                    break;
+                case 10:
+                    playlist_delete();
+                    break;
+                case 11:
                     if(confirm_dialog("Are you sure you want to wipe\nall saved songs and playlists?"))
                         wipe_memory();
                     break;
@@ -348,7 +243,7 @@ void App::show_log() {
     std::vector<std::string> lines = Logger::get_instance().get_log();
 
     int scroll_offset = 0;
-    const int viewport_height = 25; // visible log height
+    const int viewport_height = 30; // visible log height
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -384,7 +279,7 @@ void App::show_log() {
 
     ui::ButtonOption stile_back;
     stile_back.transform = [](const ui::EntryState& state) {
-        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 20);
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 30);
  
         if (state.focused)
             e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
@@ -423,11 +318,11 @@ void App::show_log() {
 }
 
 void App::playlist_selection() {
-    if(playlists.empty()) return;
+    if(play_bank.empty()) return;
 
     std::vector<std::string> options;
 
-    std::vector<Playlist*> playlist_arr = get_playlists();
+    std::vector<Playlist*> playlist_arr = play_bank.get_playlists();
 
     for(const auto p : playlist_arr)
         options.push_back(p->get_name());
@@ -438,7 +333,7 @@ void App::playlist_selection() {
 
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            song_queue_play_screen(get_songs_in_playlist(playlist_arr[menu.get_selected_id()]));
+            song_queue_play_screen(play_bank.get_songs_in_playlist(playlist_arr[menu.get_selected_id()], &song_bank));
             return true;
         }
         return false;
@@ -654,16 +549,18 @@ void App::song_play_screen(Song* song) {
 
                 bus_rows.push_back(
                     ui::hbox({
-                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 15),
+                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 20),
+                        ui::text(" → " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 10) | ui::dim,
                         ui::separatorEmpty(),
                         ui::vbox({
                             ui::gauge(bus_levels[i].first) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
                             ui::gauge(bus_levels[i].second) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
-                            ui::text("→ " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 30)
                         }) | ui::flex,
-                        ui::filler() | ui::flex
+                        ui::filler() | ui::flex,
+
+                        ui::separator(),
                     })
                 );
             }
@@ -969,11 +866,11 @@ void App::song_creation(Song* edit_song) {
         if (song_bank.song_exists_by_name(nome_canzone)) {
             if (edit_song) {
                 if (edit_song->get_name() != nome_canzone) {
-                    Logger::get_instance().log_err("[SongEditor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
+                    Logger::get_instance().log_err("[Song Editor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
                     return;
                 }
             } else {
-                Logger::get_instance().log_err("[SongEditor] unable to create song '" + nome_canzone + "' since it already exists");
+                Logger::get_instance().log_err("[Song Editor] unable to create song '" + nome_canzone + "' since it already exists");
                 return;
             }
         }
@@ -1002,9 +899,9 @@ void App::song_creation(Song* edit_song) {
         }
 
         if (!song_bank.save_song_to_file(song_uid))
-            Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
+            Logger::get_instance().log_err("[Song Editor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
         else
-            Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
+            Logger::get_instance().log(((edit_song) ? "[Song Editor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
 
         screen.ExitLoopClosure()();
     };
@@ -1095,13 +992,14 @@ void App::song_creation(Song* edit_song) {
 }
 
 void App::song_editing() {
-    std::vector<Song*> songs = song_bank.get_songs();
+    if(song_bank.empty()) return;
 
-    if(songs.empty()) return;
+    std::vector<Song*> songs;
 
     std::vector<std::string> options;
 
     auto load_songs = [&] {
+        songs = song_bank.get_songs();
         options.clear();
 
         for(const auto s : songs) {
@@ -1127,6 +1025,554 @@ void App::song_editing() {
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
             song_creation(songs[menu.get_selected_id()]);
+            load_songs();
+            menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    }, true);
+}
+
+void App::song_delete() {
+    if(song_bank.empty()) return;
+
+    std::vector<Song*> songs;
+
+    std::vector<std::string> options;
+
+    auto load_songs = [&] {
+        songs = song_bank.get_songs();
+        options.clear();
+
+        for(const auto s : songs) {
+            options.push_back(s->get_name());
+        }
+    };
+    
+    load_songs();
+
+    UIMenu menu("Select the song to delete", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            
+            Song* song = songs[menu.get_selected_id()];
+
+            if(!songs.empty()) {
+                song = songs[menu.get_selected_id()];
+            } else return true;
+
+            if(confirm_dialog("Are you sure you want to delete\nthe song '" + song->get_name() + "' ?")) {
+                song_bank.delete_song(song);
+                load_songs();
+
+                if(options.empty()) {
+                    menu.get_screen().ExitLoopClosure()();
+                    return true;
+                }
+
+                menu.set_selected(0);
+                menu.set_options(options);
+            }
+
+            return true;
+        }
+        return false;
+    }, true);
+}
+
+
+// Marker editor: riproduci la canzone come riferimento, mettila in pausa dove
+// serve e premi "+ Add Marker" per inserire un marker al timestamp corrente.
+//
+// Include necessari oltre ai tuoi:
+//   <algorithm> <cctype> <cmath> <cstdio> <list> <memory> <string> <utility> <vector>
+//
+// ASSUNZIONI (correggile se non combaciano col tuo backend):
+//   - come in song_play_screen(), la riproduzione viene avviata DAL CHIAMANTE:
+//     questa funzione non carica/avvia nulla, usa solo resume/pause/stop e
+//     set_playback_pos;
+//   - all'uscita (Save o Cancel) chiamo main_player.stop().
+
+struct UIMarker {
+    std::string marker_name;
+    std::string marker_timestamp;   // formato "MM:SS"
+};
+
+void App::marker_editing(Song* song) {
+    if(!song) return;
+
+    auto screen = ui::ScreenInteractive::TerminalOutput();
+
+    std::string titolo_brano = song->get_name();
+
+    // --- Conversione "MM:SS" <-> secondi ------------------------------------
+
+    // "MM:SS" -> secondi. Ritorna -1.0f se la stringa non è valida.
+    auto timestamp_to_seconds = [](const std::string& ts) -> float {
+        auto colon = ts.find(':');
+        if (colon == std::string::npos) return -1.0f;
+
+        std::string mm = ts.substr(0, colon);
+        std::string ss = ts.substr(colon + 1);
+
+        auto all_digits = [](const std::string& s) {
+            return !s.empty() && std::all_of(s.begin(), s.end(),
+                [](unsigned char c) { return std::isdigit(c) != 0; });
+        };
+
+        if (!all_digits(mm) || !all_digits(ss) || mm.size() > 4 || ss.size() > 2)
+            return -1.0f;
+
+        int minutes = std::stoi(mm);
+        int seconds = std::stoi(ss);
+        if (seconds >= 60) return -1.0f;
+
+        return static_cast<float>(minutes * 60 + seconds);
+    };
+
+    // secondi -> "MM:SS" (troncato al secondo)
+    auto seconds_to_timestamp = [](double secs) -> std::string {
+        int total = std::max(0, static_cast<int>(std::floor(secs)));
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%02d:%02d", total / 60, total % 60);
+        return buf;
+    };
+
+    // --- Stato playback ------------------------------------------------------
+
+    std::pair<double, double> progresso(0.0, 0.0);   // (posizione, durata)
+    int longest_bus = main_player.get_longest_bus_id();
+    bool is_first_frame = true;
+
+    // --- Stato dei marker ----------------------------------------------------
+
+    std::list<UIMarker> marker_list;
+    int prossimo_numero_marker = 1;
+
+    std::string errore;                 // mostrato in rosso sotto i bottoni
+    std::string marker_line;            // la barra dei marker già composta
+    bool markers_dirty = true;          // vero se la barra va ricostruita
+    int last_bar_width = -1;
+    double last_bar_duration = -1.0;
+
+    auto segna_modificato = [&] {
+        markers_dirty = true;
+        errore.clear();
+    };
+
+    // --- Slider di progresso (seek) -----------------------------------------
+
+    ui::SliderOption<double> opzioni_progresso;
+    opzioni_progresso.value = &progresso.first;
+    opzioni_progresso.min = 0.0;
+    opzioni_progresso.max = &progresso.second;
+    opzioni_progresso.increment = 1.0;
+
+    auto slider_progresso = ui::Slider<double>(opzioni_progresso);
+
+    bool is_seeking = false;
+    ui::Box slider_box;
+
+    auto seek_catcher = ui::CatchEvent(slider_progresso, [&](ui::Event event) {
+        if (!event.is_mouse())
+            return false;
+
+        auto& mouse = event.mouse();
+
+        if (mouse.button == ui::Mouse::Left) {
+            if (mouse.motion == ui::Mouse::Pressed &&
+                slider_box.Contain(mouse.x, mouse.y)) {
+                is_seeking = true;
+            } else if (mouse.motion == ui::Mouse::Released && is_seeking) {
+                is_seeking = false;
+                main_player.set_playback_pos(progresso.first);
+            }
+        }
+
+        return false;
+    });
+
+    // --- Bottoni di riproduzione ---------------------------------------------
+
+    ui::ButtonOption opzioni_bottone;
+    opzioni_bottone.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 10);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+
+    auto btn_play = ui::Button("▶", [&] {
+        main_player.resume();
+        ui::animation::RequestAnimationFrame();
+    }, opzioni_bottone);
+
+    auto btn_pause = ui::Button("⏸", [&] {
+        main_player.pause();
+    }, opzioni_bottone);
+
+    auto pulsanti_riproduzione = ui::Container::Horizontal({
+        btn_play,
+        btn_pause,
+    });
+
+    // --- Lista dinamica dei marker -------------------------------------------
+
+    ui::ButtonOption opzioni_elimina;
+    opzioni_elimina.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(" " + state.label + " ");
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+        return e;
+    };
+
+    auto container_marker = ui::Container::Vertical({});
+
+    auto crea_ui_marker = [&](std::list<UIMarker>::iterator it) -> ui::Component {
+        UIMarker& stato = *it;
+
+        ui::InputOption opzioni_input;
+        opzioni_input.on_change = segna_modificato;
+
+        auto input_nome = ui::Input(&stato.marker_name, "Marker name...", opzioni_input);
+        auto input_timestamp = ui::Input(&stato.marker_timestamp, "MM:SS", opzioni_input);
+
+        auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
+
+        // L'eliminazione viene DIFFERITA con screen.Post(): se distruggessimo il
+        // componente direttamente qui, il bottone verrebbe liberato mentre il
+        // suo stesso callback è ancora in esecuzione. Post() la esegue appena
+        // l'evento corrente è stato gestito per intero.
+        auto btn_elimina = ui::Button("🗑 Delete",
+            [&screen, &prossimo_numero_marker, &marker_list, &segna_modificato, self_weak_box, it] {
+                if(--prossimo_numero_marker < 1)
+                    prossimo_numero_marker = 1;
+                    
+
+                screen.Post([&marker_list, &segna_modificato, self_weak_box, it] {
+                    // Se il componente non esiste più (doppio click), non fare nulla:
+                    // eseguire erase(it) due volte sarebbe undefined behavior.
+                    if (auto self = self_weak_box->lock()) {
+                        self->Detach();
+                        marker_list.erase(it);
+                        segna_modificato();
+                    }
+                });
+            }, opzioni_elimina);
+
+        auto gruppo = ui::Container::Horizontal({
+            input_nome,
+            input_timestamp,
+            btn_elimina,
+        });
+
+        ui::Component componente = ui::Renderer(gruppo,
+            [&stato, &progresso, timestamp_to_seconds, input_nome, input_timestamp, btn_elimina] {
+                ui::Element ts_el = input_timestamp->Render() | ui::size(ui::WIDTH, ui::EQUAL, 7);
+
+                // timestamp non valido -> in rosso
+                float timestamp_seconds = timestamp_to_seconds(stato.marker_timestamp);
+
+                if (timestamp_seconds < 0.0f || timestamp_seconds > progresso.second)
+                    ts_el = ts_el | ui::color(ui::Color::Red);
+
+                return ui::hbox({
+                           ui::text("Name: ") | ui::dim,
+                           input_nome->Render() | ui::flex,
+                           ui::text("  Time: ") | ui::dim,
+                           ts_el,
+                           ui::text("  "),
+                           btn_elimina->Render(),
+                       }) |
+                       ui::border;
+            });
+
+        *self_weak_box = componente;
+        return componente;
+    };
+
+    auto aggiungi_marker = [&](const std::string& nome, const std::string& timestamp) {
+        marker_list.push_back({nome, timestamp});
+        auto it = std::prev(marker_list.end());
+        container_marker->Add(crea_ui_marker(it));
+        segna_modificato();
+    };
+
+    // Il bottone inserisce un marker alla posizione corrente della canzone.
+    auto on_aggiungi_click = [&] {
+        aggiungi_marker("Marker " + std::to_string(prossimo_numero_marker++),
+                        seconds_to_timestamp(progresso.first));
+    };
+
+    auto btn_aggiungi = ui::Button("+ Add Marker", on_aggiungi_click);
+
+    // TODO (modifica di marker esistenti): precarica qui i marker della canzone
+    // con una chiamata per ognuno, es.
+    for(const auto& i : song->get_markers()) {
+        auto m = i.second;
+        aggiungi_marker(m.get_name(), seconds_to_timestamp(m.get_timestamp()));
+    }
+
+    // --- Salvataggio / annullamento ------------------------------------------
+
+    auto on_salva_click = [&] {
+        std::vector<std::pair<std::string, float>> markers_da_salvare;   // (nome, secondi)
+
+        for (const auto& m : marker_list) {
+            float ts = timestamp_to_seconds(m.marker_timestamp);
+
+            if (m.marker_name.empty() || ts < 0.0f) {
+                errore = "Invalid marker: '" + m.marker_name + "' (" + m.marker_timestamp + ")";
+                return;
+            }
+            if (progresso.second > 0.0 && ts > progresso.second) {
+                errore = "Marker '" + m.marker_name + "' is beyond the end of the song";
+                return;
+            }
+
+            markers_da_salvare.emplace_back(m.marker_name, ts);
+        }
+
+        std::stable_sort(markers_da_salvare.begin(), markers_da_salvare.end(),
+                         [](const auto& a, const auto& b) { return a.second < b.second; });
+
+        // TODO: collega qui il tuo backend. `markers_da_salvare` contiene
+        // (nome, timestamp in secondi) già validato e ordinato per timestamp.
+        song->clear_markers();
+
+        for(const auto& i : markers_da_salvare) {
+            song->add_marker(Marker(i.second, i.first));
+        }
+
+        auto song_uid = song_bank.get_song_uid(song);
+
+        if(song_uid.empty()) {
+            Logger::get_instance().log_err("[Marker Editor] unable to save song '" + song->get_name() + "' since it does not exist in song bank. All changes will be discarded");
+
+            main_player.stop();
+            screen.ExitLoopClosure()();
+            return;
+        }
+
+        if (!song_bank.save_song_to_file(song_uid))
+            Logger::get_instance().log_err("[Marker Editor] unable to save song '" + song->get_name() + "'. All changes will be discarded");
+        else
+            Logger::get_instance().log("[Marker Editor]>>> Edited markers in song '" + song->get_name() + "'");
+
+        main_player.stop();
+        screen.ExitLoopClosure()();
+    };
+
+    auto on_annulla_click = [&] {
+        main_player.stop();
+        screen.ExitLoopClosure()();
+    };
+
+    ui::ButtonOption stile_salva;
+    stile_salva.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Green) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+
+    ui::ButtonOption stile_annulla;
+    stile_annulla.transform = [](const ui::EntryState& state) {
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 18);
+        if (state.focused)
+            e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+        return e | ui::border;
+    };
+
+    auto btn_salva = ui::Button("Save & Back", on_salva_click, stile_salva);
+    auto btn_annulla = ui::Button("Cancel", on_annulla_click, stile_annulla);
+
+    auto bottoni_finali = ui::Container::Horizontal({
+        btn_salva,
+        btn_annulla,
+    });
+
+    // --- Albero dei componenti -----------------------------------------------
+
+    auto layout_principale = ui::Container::Vertical({
+        seek_catcher,
+        pulsanti_riproduzione,
+        btn_aggiungi,
+        container_marker,
+        bottoni_finali,
+    });
+
+    // --- Barra dei marker -----------------------------------------------------
+    // Ricostruita SOLO quando serve (vedi renderer): marker modificati,
+    // larghezza dello slider cambiata o durata cambiata.
+
+    auto build_marker_line = [&] {
+        int width = slider_box.x_max - slider_box.x_min + 1;
+        double duration = progresso.second;
+
+        marker_line.clear();
+        if (width <= 1 || duration <= 0.0) return;
+
+        // Marker validi (timestamp parsabile e dentro la durata), ordinati.
+        std::vector<std::pair<float, std::string>> validi;
+        for (const auto& m : marker_list) {
+            float ts = timestamp_to_seconds(m.marker_timestamp);
+            if (ts >= 0.0f && ts <= duration)
+                validi.emplace_back(ts, m.marker_name);
+        }
+        std::stable_sort(validi.begin(), validi.end(),
+                         [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        std::string buffer(width, ' ');
+        std::vector<int> pos;
+        pos.reserve(validi.size());
+
+        for (const auto& v : validi) {
+            int idx = std::min(width - 1, static_cast<int>(std::floor(v.first / duration * width)));
+            buffer[idx] = '|';
+            pos.push_back(idx);
+        }
+
+        // Il nome di ogni marker occupa il segmento che lo PRECEDE, come in
+        // song_play_screen().
+        for (size_t i = 0; i < validi.size(); i++) {
+            int start = (i == 0) ? 0 : pos[i - 1] + 1;
+            int end = pos[i] - 1;
+            int len = end - start + 1;
+            if (len <= 0) continue;
+
+            const std::string& name = validi[i].second;
+            int name_len = static_cast<int>(name.size());
+
+            if (len <= name_len) {
+                for (int j = 0; j < len; j++)
+                    buffer[start + j] = name[j];
+            } else {
+                int offset = start + (len - name_len) / 2;
+                for (int j = 0; j < name_len; j++)
+                    buffer[offset + j] = name[j];
+            }
+        }
+
+        marker_line = buffer;
+    };
+
+    // --- Renderer -------------------------------------------------------------
+
+    auto renderer = ui::Renderer(layout_principale, [&] {
+        if (!is_seeking)
+            progresso = main_player.get_bus_playback_info(longest_bus);
+
+        if (main_player.is_playing())
+            ui::animation::RequestAnimationFrame();
+
+        // Al primo frame slider_box non è ancora popolato da reflect(): chiedi
+        // un secondo frame così la barra dei marker si costruisce subito,
+        // anche con la canzone in pausa.
+        if (is_first_frame) {
+            is_first_frame = false;
+            ui::animation::RequestAnimationFrame();
+        }
+
+        int width = slider_box.x_max - slider_box.x_min + 1;
+        if (markers_dirty || width != last_bar_width || progresso.second != last_bar_duration) {
+            build_marker_line();
+            last_bar_width = width;
+            last_bar_duration = progresso.second;
+            markers_dirty = false;
+        }
+
+        std::string stato = main_player.is_paused() ? "Paused"
+                          : (main_player.is_playing() ? "Playing" : "Stopped");
+
+        return ui::vbox({
+                   ui::text("Marker Editor - " + titolo_brano) | ui::bold | ui::center,
+                   ui::separatorEmpty(),
+
+                   ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight) | ui::color(ui::Color::Black),
+                   seek_catcher->Render() | ui::reflect(slider_box),
+
+                   ui::separatorEmpty(),
+
+                   ui::text(seconds_to_timestamp(progresso.first) + " | " + seconds_to_timestamp(progresso.second))
+                       | ui::center,
+
+                   ui::separatorEmpty(),
+
+                   ui::hbox({
+                       ui::filler(),
+                       btn_play->Render(),
+                       ui::text(" "),
+                       btn_pause->Render(),
+                       ui::filler(),
+                   }),
+
+                   ui::text("State: " + stato) | ui::center | ui::dim,
+
+                   ui::separator(),
+
+                   ui::hbox({
+                       ui::text("Markers") | ui::bold,
+                       ui::filler(),
+                       btn_aggiungi->Render(),
+                   }),
+                   ui::separator(),
+
+                   container_marker->Render() | ui::vscroll_indicator | ui::frame |
+                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
+
+                   ui::separator(),
+                   bottoni_finali->Render() | ui::center,
+                   ui::text(errore) | ui::color(ui::Color::Red) | ui::center,
+               }) |
+               ui::size(ui::WIDTH, ui::GREATER_THAN, 60) |
+               ui::border;
+    });
+
+    screen.Loop(renderer);
+}
+
+void App::marker_editing_selection() {
+    if(song_bank.empty()) return;
+
+    std::vector<Song*> songs = song_bank.get_songs();
+
+    main_player.set_queue(songs);
+
+    std::vector<std::string> options;
+
+    auto load_songs = [&] {
+        options.clear();
+
+        for(const auto s : songs) {
+            song_bank.validate_song(s);
+
+            std::string name = s->get_name();
+
+            if(s->is_degraded())
+                name.insert(0, 1, '%');
+            else if(s->is_corrupted())
+                name.insert(0, 1, '$'); 
+
+            options.push_back(name);
+        }
+    };
+    
+    load_songs();
+
+    UIMenu menu("Choose a song for Marker configuration", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            main_player.play(menu.get_selected_id());
+            marker_editing(main_player.get_current_song());
+
             load_songs();
             menu.set_options(options);
 
@@ -1247,14 +1693,14 @@ void App::playlist_creation(Playlist* edit_playlist) {
     auto on_salva_click = [&] {
         if(canzoni_playlist.empty() || nome_playlist.empty()) return;
 
-        if(playlist_exists(nome_playlist)) {
+        if(play_bank.playlist_exists(nome_playlist)) {
             if(edit_playlist) {
                 if(edit_playlist->get_name() != nome_playlist) {
-                    Logger::get_instance().log_err("[PlaylistEditor] unable to edit playlist '" + edit_playlist->get_name() + "' with new name '" + nome_playlist + "' since it already exists");
+                    Logger::get_instance().log_err("[Playlist Editor] unable to edit playlist '" + edit_playlist->get_name() + "' with new name '" + nome_playlist + "' since it already exists");
                     return;
                 }
             } else {
-                Logger::get_instance().log_err("[PlaylistEditor] unable to create new playlist '" + nome_playlist + "' since it already exists");
+                Logger::get_instance().log_err("[Playlist Editor] unable to create new playlist '" + nome_playlist + "' since it already exists");
                 return;
             }
         }
@@ -1264,11 +1710,11 @@ void App::playlist_creation(Playlist* edit_playlist) {
 
         if(edit_playlist) {
             new_playlist = edit_playlist;
-            playlist_uid = get_playlist_uid(edit_playlist);
+            playlist_uid = play_bank.get_playlist_uid(edit_playlist);
 
             edit_playlist->clear_songs();
         } else {
-            std::pair<std::string, Playlist*> new_playlist_and_uid = create_playlist();
+            std::pair<std::string, Playlist*> new_playlist_and_uid = play_bank.create_playlist();
 
             new_playlist = new_playlist_and_uid.second;
             playlist_uid = new_playlist_and_uid.first;
@@ -1281,10 +1727,10 @@ void App::playlist_creation(Playlist* edit_playlist) {
             new_playlist->add_song(song_bank.get_song_uid(entry.canzone));
         }
 
-        if(!save_playlist_to_file(playlist_uid))
-            Logger::get_instance().log_err("[PlaylistEditor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
+        if(!play_bank.save_playlist_to_file(playlist_uid))
+            Logger::get_instance().log_err("[Playlist Editor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
         else
-            Logger::get_instance().log("[PlaylistEditor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
+            Logger::get_instance().log("[Playlist Editor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
 
         screen.ExitLoopClosure()();
     };
@@ -1366,13 +1812,14 @@ void App::playlist_creation(Playlist* edit_playlist) {
 }
 
 void App::playlist_editing() {
-    std::vector<Playlist*> playlists = get_playlists();
+    if(play_bank.empty()) return;
 
-    if(playlists.empty()) return;
+    std::vector<Playlist*> playlists;
 
     std::vector<std::string> options;
 
     auto load_playlists = [&] {
+        playlists = play_bank.get_playlists();
         options.clear();
 
         for(const auto s : playlists) {
@@ -1391,6 +1838,57 @@ void App::playlist_editing() {
             playlist_creation(playlists[menu.get_selected_id()]);
             load_playlists();
             menu.set_options(options);
+
+            return true;
+        }
+        return false;
+    });
+}
+
+void App::playlist_delete() {
+    if(play_bank.empty()) return;
+
+    std::vector<Playlist*> playlists;
+
+    std::vector<std::string> options;
+
+    auto load_playlists = [&] {
+        options.clear();
+
+        playlists = play_bank.get_playlists();
+
+        for(const auto s : playlists) {
+            options.push_back(s->get_name());
+        }
+    };
+    
+    load_playlists();
+
+    UIMenu menu("Select the playlist to delete", options, [&] {
+        menu.get_screen().ExitLoopClosure()();
+    });
+
+    menu.render([&] (ui::Event event) {
+        if(event == ui::Event::Return) {
+            
+            Playlist* play;
+
+            if(!playlists.empty()) {
+                play = playlists[menu.get_selected_id()];
+            } else return true;
+
+            if(confirm_dialog("Are you sure you want to delete\nthe playlist '" + play->get_name() + "' ?")) {
+                play_bank.delete_playlist(play);
+                load_playlists();
+
+                if(options.empty()) {
+                    menu.get_screen().ExitLoopClosure()();
+                    return true;
+                }
+
+                menu.set_selected(0);
+                menu.set_options(options);
+            }
 
             return true;
         }

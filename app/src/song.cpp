@@ -96,7 +96,7 @@ Song* Song::create_from_file(const fs::path& path) {
 
         if(data.contains("markers")) {
             for(const auto& marker : data["markers"]) {
-                new_song->add_marker(Marker(std::max(0.0, marker.at("timestamp").get<double>()), marker["name"]));
+                new_song->add_marker(Marker(std::max<float>(0.0f, marker.at("timestamp").get<float>()), marker["name"]));
             }
         }
     } catch(...) {

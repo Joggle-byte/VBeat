@@ -15,6 +15,14 @@ SongBank::~SongBank() {
 }
 
 void SongBank::load_all(const std::string& bank_path) {
+    if(!fs::exists(bank_path)) {
+        Logger::get_instance().log_err("[Song Bank] invalid song bank path '" + bank_path + "'");
+        this->bank_path = "";
+        return;
+    }
+
+    this->bank_path = bank_path;
+
     std::vector<fs::path> all = get_files_by_extension(fs::path(bank_path), ".json");
 
     for(const auto& p : all) {
@@ -29,9 +37,15 @@ void SongBank::load_all(const std::string& bank_path) {
         bank[p.stem().string()] = s;
     }
 
-    this->bank_path = bank_path;
-
     if(bank.empty()) Logger::get_instance().log_warn("[Song Bank] song bank is empty!");
+    else Logger::get_instance().log("[Song Bank] song bank loaded succesfully");
+}
+
+void SongBank::reload_all() {
+    if(bank_path.empty()) return;
+
+    clear();
+    load_all(bank_path);
 }
 
 void SongBank::validate_song(Song* song) {
@@ -75,6 +89,8 @@ fs::path SongBank::get_song_path(const Song* song) const {
 }
 
 fs::path SongBank::get_song_path(const std::string& uid) const {
+    if(bank_path.empty()) return fs::path();
+
     auto it = bank.find(uid);
 
     if(it != bank.end())
@@ -110,6 +126,44 @@ bool SongBank::save_song_to_file(const std::string& uid) {
         return false;
 
     return song->save_to_file(get_song_path(uid));
+}
+
+void SongBank::delete_song(const std::string& uid) {
+    auto song = get_song(uid);
+
+    if(!song) return;
+    
+    std::string song_name = song->get_name();
+
+    delete song;
+
+    auto song_path = get_song_path(uid);
+
+    bank.erase(bank.find(uid));
+
+    if(fs::remove(song_path))
+        Logger::get_instance().log_warn("[SongBank] succesfully removed song '" + song_name + "' at '"+ song_path.string() + "'");
+    else 
+        Logger::get_instance().log_err("[SongBank] impossible to remove song '" + song_name + "' at '"+ song_path.string() + "'");
+}
+
+void SongBank::delete_song(Song* song) {
+    auto uid = get_song_uid(song);
+
+    if(uid.empty()) return;
+
+    std::string song_name = song->get_name();
+
+    delete song;
+
+    auto song_path = get_song_path(uid);
+
+    bank.erase(bank.find(uid));
+
+    if(fs::remove(song_path))
+        Logger::get_instance().log_warn("[SongBank] succesfully removed song '" + song_name + "' at '"+ song_path.string() + "'");
+    else 
+        Logger::get_instance().log_err("[SongBank] impossible to remove song '" + song_name + "' at '"+ song_path.string() + "'");
 }
 
 bool SongBank::song_exists(const std::string& uid) const {

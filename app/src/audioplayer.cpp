@@ -51,6 +51,10 @@ size_t AudioPlayer::get_device_audio_out_count(const std::string& id) {
     BASS_INFO info;
     BASS_GetInfo(&info);
 
+    BASS_Free();
+
+    release_device(id);
+
     return std::floor(info.speakers / 2);
 }
 
@@ -77,6 +81,15 @@ int AudioPlayer::acquire_device(const std::string& id) {
     active_devices[id] = idx;
     
     return idx;
+}
+
+void AudioPlayer::release_device(const std::string& id) {
+    auto it = active_devices.find(id);
+    if (it != active_devices.end()) {
+        BASS_SetDevice(it->second);
+        BASS_Free();
+        active_devices.erase(it);
+    }
 }
 
 void AudioPlayer::release_all_devices() {
@@ -188,54 +201,6 @@ std::vector<Marker> AudioPlayer::get_current_marker_layout() {
 // ===========================================================================
 
 
-/*
-std::vector<std::string> AudioPlayer::get_device_names() const {
-    std::vector<std::string> ret;
-    BASS_DEVICEINFO info;
-    
-    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-        if(!info.driver) continue;
-
-        ret.push_back(std::string(info.name));
-    }
-
-    return ret;
-} 
-
-std::vector<std::string> AudioPlayer::get_device_ids() const {
-    std::vector<std::string> ret;
-    BASS_DEVICEINFO info;
-    
-    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-        if(info.driver) ret.push_back(std::string(info.driver));
-    }
-
-    return ret;
-} 
-
-std::string AudioPlayer::get_device_id_from_index(int index) const {
-    BASS_DEVICEINFO info;
-
-    if(!BASS_GetDeviceInfo(index, &info)) return "";
-    if(!info.driver) return "";
-
-    return std::string(info.driver);
-}
-
-std::string AudioPlayer::get_device_name_from_id(const std::string& id) const {
-    BASS_DEVICEINFO info;
-    
-    for (int i = 0; BASS_GetDeviceInfo(i, &info); i++) {
-        if(info.driver) {
-            if(std::string(info.driver) == id) return info.name;
-        }
-    }
-
-    return "";
-}
-*/
-
-
 // ============================== SONG LOADING ==============================
 
 bool AudioPlayer::load_song(Song* new_song, bool verbose) {
@@ -338,6 +303,8 @@ void AudioPlayer::play(int song_id) {
 
     if(!load_song(current_song)) return;
 
+    paused = false;
+
     BASS_ChannelPlay(mixer, FALSE);
 
     Logger::get_instance().log("[AudioPlayer] now playing '" + current_song->get_name() + "'\n");
@@ -359,6 +326,7 @@ void AudioPlayer::resume() {
 }
 
 void AudioPlayer::stop() {
+    paused = false;
     BASS_ChannelStop(mixer);
 }
 

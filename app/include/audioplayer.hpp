@@ -98,6 +98,7 @@ private:
     bool should_restart = false;
 
     int acquire_device(const std::string& id);
+    void release_device(const std::string& id);
     void release_all_devices();
 
     bool is_valid_bus(int id) const;

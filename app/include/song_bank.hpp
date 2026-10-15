@@ -16,11 +16,16 @@ public:
 
     void load_all(const std::string& bank_path);
 
+    void reload_all();
+
     void clear();
 
     std::pair<std::string, Song*> create_song();
 
     bool save_song_to_file(const std::string& uid);
+
+    void delete_song(const std::string& uid);
+    void delete_song(Song* song);
 
     void append_new(Song* s);
 
@@ -41,6 +46,10 @@ public:
 
     void validate_song(Song* song);
     void validate_all();
+
+    const std::string& get_path() { return bank_path; }
+
+    bool empty() const { return bank.empty(); }
 
 private:
     std::map<std::string, Song*> bank;

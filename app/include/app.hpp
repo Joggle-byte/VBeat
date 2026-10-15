@@ -4,8 +4,17 @@
 
 #include "audioplayer.hpp"
 #include "song_bank.hpp"
+#include "playlist_bank.hpp"
 
 namespace ui = ftxui;
+
+
+struct ConfigFile {
+    std::string song_bank_path;
+    std::string play_bank_path;
+
+    bool failed = false;
+};
 
 
 class App {
@@ -19,7 +28,7 @@ public:
 private:
 
     SongBank song_bank;
-    std::map<std::string, Playlist*> playlists;
+    PlaylistBank play_bank;
 
     AudioPlayer main_player;
 
@@ -32,11 +41,15 @@ private:
     const int screen_height = 800;
 
 
-    bool load_config_file();
+    ConfigFile load_config_file();
 
     void load_all_playlists(const std::string& bank_path);
 
     std::pair<std::string, Playlist*> create_playlist();
+
+    void delete_playlist(const std::string& uid);
+
+    void delete_playlist(Playlist* play);
 
     bool save_playlist_to_file(const std::string& uid);
 
@@ -69,9 +82,14 @@ private:
     void playlist_selection();
     void playlist_creation(Playlist* edit_playlist = nullptr);
     void playlist_editing();
+    void playlist_delete();
 
     void song_creation(Song* song = nullptr);
     void song_editing();
+    void song_delete();
+
+    void marker_editing_selection();
+    void marker_editing(Song* song);
 
     void song_selection();
 
