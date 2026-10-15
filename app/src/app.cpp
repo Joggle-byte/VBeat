@@ -26,7 +26,7 @@ int App::main() {
     std::system("cls");
 
     Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
-    Logger::get_instance().log("====== Startup Log ======");
+    Logger::get_instance().log("============= Startup Log =============");
 
     auto config = load_config_file();
 
@@ -35,7 +35,7 @@ int App::main() {
     song_bank.load_all(config.song_bank_path);
     play_bank.load_all(config.play_bank_path, &song_bank);
 
-    Logger::get_instance().log("=========================\n");
+    Logger::get_instance().log("=====================================\n");
 
     main_player.list_devices();
 
@@ -947,9 +947,9 @@ void App::song_creation(Song* edit_song) {
 }
 
 void App::song_editing() {
-    std::vector<Song*> songs;
+    if(song_bank.empty()) return;
 
-    if(songs.empty()) return;
+    std::vector<Song*> songs;
 
     std::vector<std::string> options;
 
@@ -990,9 +990,9 @@ void App::song_editing() {
 }
 
 void App::song_delete() {
-    std::vector<Song*> songs;
+    if(song_bank.empty()) return;
 
-    if(songs.empty()) return;
+    std::vector<Song*> songs;
 
     std::vector<std::string> options;
 
@@ -1016,9 +1016,20 @@ void App::song_delete() {
             
             Song* song = songs[menu.get_selected_id()];
 
+            if(!songs.empty()) {
+                song = songs[menu.get_selected_id()];
+            } else return true;
+
             if(confirm_dialog("Are you sure you want to delete\nthe song '" + song->get_name() + "' ?")) {
                 song_bank.delete_song(song);
                 load_songs();
+
+                if(options.empty()) {
+                    menu.get_screen().ExitLoopClosure()();
+                    return true;
+                }
+
+                menu.set_selected(0);
                 menu.set_options(options);
             }
 

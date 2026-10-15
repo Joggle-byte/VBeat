@@ -49,6 +49,8 @@ public:
 
     const std::string& get_path() { return bank_path; }
 
+    bool empty() const { return bank.empty(); }
+
 private:
     std::map<std::string, Song*> bank;
     ResourceValidator validator;

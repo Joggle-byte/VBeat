@@ -132,6 +132,8 @@ void SongBank::delete_song(const std::string& uid) {
     auto song = get_song(uid);
 
     if(!song) return;
+    
+    std::string song_name = song->get_name();
 
     delete song;
 
@@ -140,9 +142,9 @@ void SongBank::delete_song(const std::string& uid) {
     bank.erase(bank.find(uid));
 
     if(fs::remove(song_path))
-        Logger::get_instance().log_warn("[Song Bank] succesfully removed song '" + song_path.string() + "'");
+        Logger::get_instance().log_warn("[SongBank] succesfully removed song '" + song_name + "' at '"+ song_path.string() + "'");
     else 
-        Logger::get_instance().log_err("[Song Bank] impossible to remove song '" + song_path.string() + "'");
+        Logger::get_instance().log_err("[SongBank] impossible to remove song '" + song_name + "' at '"+ song_path.string() + "'");
 }
 
 void SongBank::delete_song(Song* song) {
@@ -150,6 +152,8 @@ void SongBank::delete_song(Song* song) {
 
     if(uid.empty()) return;
 
+    std::string song_name = song->get_name();
+
     delete song;
 
     auto song_path = get_song_path(uid);
@@ -157,9 +161,9 @@ void SongBank::delete_song(Song* song) {
     bank.erase(bank.find(uid));
 
     if(fs::remove(song_path))
-        Logger::get_instance().log_warn("[SongBank] succesfully removed song '" + song_path.string() + "'");
+        Logger::get_instance().log_warn("[SongBank] succesfully removed song '" + song_name + "' at '"+ song_path.string() + "'");
     else 
-        Logger::get_instance().log_err("[SongBank] impossible to remove song '" + song_path.string() + "'");
+        Logger::get_instance().log_err("[SongBank] impossible to remove song '" + song_name + "' at '"+ song_path.string() + "'");
 }
 
 bool SongBank::song_exists(const std::string& uid) const {

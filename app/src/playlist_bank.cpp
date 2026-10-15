@@ -82,6 +82,8 @@ void PlaylistBank::delete_playlist(const std::string& uid) {
     auto play = get_playlist(uid);
 
     if(!play) return;
+    
+    std::string play_name = play->get_name();
 
     delete play;
 
@@ -90,9 +92,9 @@ void PlaylistBank::delete_playlist(const std::string& uid) {
     bank.erase(bank.find(uid));
 
     if(fs::remove(play_path))
-        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_path.string() + "'");
+        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_name + "' at '" + play_path.string() + "'");
     else 
-        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_path.string() + "'");
+        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_name + "' at '" + play_path.string() + "'");
 }
 
 void PlaylistBank::delete_playlist(Playlist* play) {
@@ -100,6 +102,8 @@ void PlaylistBank::delete_playlist(Playlist* play) {
 
     if(uid.empty()) return;
 
+    std::string play_name = play->get_name();
+
     delete play;
 
     auto play_path = get_playlist_path(uid);
@@ -107,9 +111,9 @@ void PlaylistBank::delete_playlist(Playlist* play) {
     bank.erase(bank.find(uid));
 
     if(fs::remove(play_path))
-        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_path.string() + "'");
+        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_name + "' at '" + play_path.string() + "'");
     else 
-        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_path.string() + "'");
+        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_name + "' at '" + play_path.string() + "'");
 }
 
 void PlaylistBank::clear() {
