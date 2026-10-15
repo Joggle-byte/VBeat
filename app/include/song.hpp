@@ -20,15 +20,15 @@ enum class SongState {
 class Marker {
 public:
     Marker() {}
-    Marker(double timestamp, const std::string& _name) :
+    Marker(float timestamp, const std::string& _name) :
         timestamp_seconds(timestamp),
         name(_name) {}
     
     const std::string get_name() const { return name; }
-    double get_timestamp() const { return timestamp_seconds; }
+    float get_timestamp() const { return timestamp_seconds; }
 
 private:
-    double timestamp_seconds;
+    float timestamp_seconds;
     std::string name;
 };
 
@@ -42,6 +42,7 @@ public:
     int add_track(AudioTrack track);
     bool remove_track(int track_id);
     void clear_tracks() { tracks.clear(); }
+    void clear_markers() { markers.clear(); }
 
     void set_track_volume(int track_id, float vol);
     void set_track_filepath(int track_id, const std::string& path);
@@ -62,7 +63,7 @@ public:
     SongState get_state() const { return state; }
     TrackState get_track_state(int track_id) const;
 
-    const std::map<double, Marker>& get_markers() const { return markers; }
+    const std::map<float, Marker>& get_markers() const { return markers; }
 
     bool is_corrupted() const { return state == SongState::CORRUPTED; }
     bool is_degraded() const { return state == SongState::DEGRADED; }
@@ -79,7 +80,7 @@ private:
     std::string device_id;
     SongState state;
 
-    std::map<double, Marker> markers;
+    std::map<float, Marker> markers;
 
     bool is_valid_track_id(int track_id) const;
 };

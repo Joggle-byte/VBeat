@@ -90,6 +90,9 @@ private:
     void song_editing();
     void song_delete();
 
+    void marker_editing_selection();
+    void marker_editing(Song* song);
+
     void song_selection();
 
     void song_queue_play_screen(const std::vector<Song*> queue);
