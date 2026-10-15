@@ -19,6 +19,10 @@ public:
 
     void set_volume(float vol);
 
+    void mute();
+
+    void unmute();
+
     bool is_playing();
 
     bool is_stopped();
@@ -43,6 +47,8 @@ private:
     HSTREAM handle = 0;
 
     std::vector<int> device_channel_map;
+
+    float volume = 1.0; 
 
     bool has_finished_playing = false;
 

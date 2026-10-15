@@ -200,7 +200,7 @@ void App::show_log() {
     std::vector<std::string> lines = Logger::get_instance().get_log();
 
     int scroll_offset = 0;
-    const int viewport_height = 25; // visible log height
+    const int viewport_height = 30; // visible log height
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -236,7 +236,7 @@ void App::show_log() {
 
     ui::ButtonOption stile_back;
     stile_back.transform = [](const ui::EntryState& state) {
-        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 20);
+        ui::Element e = ui::text(state.label) | ui::center | ui::size(ui::WIDTH, ui::EQUAL, 30);
  
         if (state.focused)
             e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
@@ -506,16 +506,18 @@ void App::song_play_screen(Song* song) {
 
                 bus_rows.push_back(
                     ui::hbox({
-                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 15),
+                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 20),
+                        ui::text(" → " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 10) | ui::dim,
                         ui::separatorEmpty(),
                         ui::vbox({
                             ui::gauge(bus_levels[i].first) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
                             ui::gauge(bus_levels[i].second) | ui::color(ui::Color::Cyan),
                             ui::separatorEmpty(),
-                            ui::text("→ " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 30)
                         }) | ui::flex,
-                        ui::filler() | ui::flex
+                        ui::filler() | ui::flex,
+
+                        ui::separator(),
                     })
                 );
             }

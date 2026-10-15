@@ -116,8 +116,16 @@ bool AudioBus::is_stopped() {
 void AudioBus::set_volume(float vol) {
     if (handle) {
         BASS_ChannelSetAttribute(handle, BASS_ATTRIB_VOL, vol);
-        track.volume = vol;   
+        volume = vol;
     }
+}
+
+void AudioBus::mute() {
+    set_volume(0.0f);
+}
+
+void AudioBus::unmute() {
+    set_volume(track.volume);
 }
 
 void AudioBus::free() {
@@ -157,8 +165,8 @@ std::pair<float, float> AudioBus::get_stereo_audio_levels() const {
 
     if (BASS_Mixer_ChannelGetLevelEx(handle, levels, 0.02f, BASS_LEVEL_STEREO)) {
         return {
-            std::clamp(levels[0] * track.volume, 0.0f, 1.0f), 
-            std::clamp(levels[1] * track.volume, 0.0f, 1.0f)
+            std::clamp(levels[0] * volume, 0.0f, 1.0f), 
+            std::clamp(levels[1] * volume, 0.0f, 1.0f)
         };
     }
     

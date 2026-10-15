@@ -303,6 +303,8 @@ void AudioPlayer::play(int song_id) {
 
     if(!load_song(current_song)) return;
 
+    paused = false;
+
     BASS_ChannelPlay(mixer, FALSE);
 
     Logger::get_instance().log("[AudioPlayer] now playing '" + current_song->get_name() + "'\n");
@@ -324,6 +326,7 @@ void AudioPlayer::resume() {
 }
 
 void AudioPlayer::stop() {
+    paused = false;
     BASS_ChannelStop(mixer);
 }
 
