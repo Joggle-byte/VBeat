@@ -1207,12 +1207,12 @@ void App::marker_editing(Song* song) {
         return e | ui::border;
     };
 
-    auto btn_play = ui::Button("▶", [&] {
+    auto btn_play = ui::Button("Play", [&] {
         main_player.resume();
         ui::animation::RequestAnimationFrame();
     }, opzioni_bottone);
 
-    auto btn_pause = ui::Button("⏸", [&] {
+    auto btn_pause = ui::Button("Pause", [&] {
         main_player.pause();
     }, opzioni_bottone);
 
