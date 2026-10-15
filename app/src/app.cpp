@@ -67,6 +67,8 @@ std::string make_default_config_file(fs::path dir) {
 }
 
 ConfigFile App::load_config_file() {
+    ConfigFile ret;
+
     fs::path dir = getAppSupportDir(APP_NAME);
 
     fs::create_directories(dir);
@@ -79,7 +81,8 @@ ConfigFile App::load_config_file() {
 
         if(!new_file.is_open()) {
             std::cout << "[VBeat] unable to create config file. Exiting...";
-            return false;
+            ret.failed = true;
+            return ret;
         }
 
         new_file << make_default_config_file(dir);
@@ -87,8 +90,6 @@ ConfigFile App::load_config_file() {
     }
 
     std::ifstream file(dir / "config.json");
-
-    ConfigFile ret;
 
     if (!file.is_open()) {
         std::cout << "[VBeat] unable to load config file. Exiting...";
