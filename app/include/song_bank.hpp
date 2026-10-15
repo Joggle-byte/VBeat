@@ -16,6 +16,8 @@ public:
 
     void load_all(const std::string& bank_path);
 
+    void reload_all();
+
     void clear();
 
     std::pair<std::string, Song*> create_song();
@@ -44,6 +46,8 @@ public:
 
     void validate_song(Song* song);
     void validate_all();
+
+    const std::string& get_path() { return bank_path; }
 
 private:
     std::map<std::string, Song*> bank;

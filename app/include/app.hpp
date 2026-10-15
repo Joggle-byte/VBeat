@@ -4,10 +4,19 @@
 
 #include "audioplayer.hpp"
 #include "song_bank.hpp"
+#include "playlist_bank.hpp"
 
 #define CONFIG_FILE_PATH "./"
 
 namespace ui = ftxui;
+
+
+struct ConfigFile {
+    std::string song_bank_path;
+    std::string play_bank_path;
+
+    bool failed = false;
+};
 
 
 class App {
@@ -21,7 +30,7 @@ public:
 private:
 
     SongBank song_bank;
-    std::map<std::string, Playlist*> playlists;
+    PlaylistBank play_bank;
 
     AudioPlayer main_player;
 
@@ -34,13 +43,14 @@ private:
     const int screen_height = 800;
 
 
-    bool load_config_file();
+    ConfigFile load_config_file();
 
     void load_all_playlists(const std::string& bank_path);
 
     std::pair<std::string, Playlist*> create_playlist();
 
     void delete_playlist(const std::string& uid);
+
     void delete_playlist(Playlist* play);
 
     bool save_playlist_to_file(const std::string& uid);

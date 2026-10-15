@@ -5,7 +5,6 @@
 #include <chrono>
 #include <algorithm>
 
-//TEMP
 #include <list>
 
 #include "../include/app.hpp"
@@ -20,7 +19,7 @@ using json = nlohmann::json;
 
 App::~App() {
     song_bank.clear();
-    clear_playlists();
+    play_bank.clear();
 }
 
 int App::main() {
@@ -29,10 +28,12 @@ int App::main() {
     Logger::get_instance().log("VBeat " + std::string(VBEAT_VERSION) + " - by Emanuele Alfieri\n");
     Logger::get_instance().log("====== Startup Log ======");
 
-    if (!load_config_file()) return 1;
+    auto config = load_config_file();
 
-    song_bank.load_all(song_bank_path);
-    load_all_playlists(playlist_bank_path);
+    if(config.failed) return 1;
+
+    song_bank.load_all(config.song_bank_path);
+    play_bank.load_all(config.play_bank_path, &song_bank);
 
     Logger::get_instance().log("=========================\n");
 
@@ -44,170 +45,32 @@ int App::main() {
     return Logger::get_instance().write_to_file();
 }
 
-bool App::load_config_file() {
+ConfigFile App::load_config_file() {
     std::ifstream file(std::string(CONFIG_FILE_PATH) + "config.json");
+
+    ConfigFile ret;
 
     if (!file.is_open()) {
         std::cout << "[VBeat] unable to load config file. Exiting...";
-        return false;
+        ret.failed = true;
+        return ret;
     }
 
     json config;
 
     try {
         file >> config;
-        song_bank_path = config.at("song_bank_path").get<std::string>();
-        playlist_bank_path = config.at("playlist_bank_path").get<std::string>();
+
+        ret.song_bank_path = config.at("song_bank_path").get<std::string>();
+        ret.play_bank_path = config.at("playlist_bank_path").get<std::string>();
+
         Logger::get_instance().set_log_file_dir(config.at("log_file_dir").get<std::string>());
     } catch (const std::exception& e) {
         Logger::get_instance().log_err(
             std::string("[VBeat] unable to parse config file: ") + e.what()
         );
-        return false;
-    }
-
-    return true;
-}
-
-void App::load_all_playlists(const std::string& bank_path) {
-    std::vector<fs::path> all = get_files_by_extension(fs::path(bank_path), ".json");
-
-    for(const auto& p : all) {
-        Playlist* playlist = Playlist::create_from_file(p);
-
-        if(!playlist) {
-            Logger::get_instance().log_err("[Playlist Bank] unable to load playlist '" + p.string() + "'");
-            return;
-        }
-        
-        std::vector<std::string> songs = playlist->get_songs();
-
-        for(size_t i = 0; i < songs.size(); i++) {
-            if(!song_bank.song_exists(songs[i])) {
-                Logger::get_instance().log_err("[Playlist Bank] (" + playlist->get_name() + ") " + "song with uid '" + songs[i] + "' doesn't exist in song bank");
-                playlist->remove_song(i);
-            }
-        }
-
-        playlists[p.stem().string()] = playlist;
-    }
-
-    if(playlists.empty())
-        Logger::get_instance().log_warn("[Playlist Bank] playlist bank is empty!");
-    else
-        Logger::get_instance().log("[Playlist Bank] playlist bank loaded succesfully");
-}
-
-std::pair<std::string, Playlist*> App::create_playlist() {
-    Playlist* p = new Playlist();
-
-    std::string uid = generate_uuid_v4();
-
-    playlists[uid] = p;
-
-    return std::pair<std::string, Playlist*>(uid, p);
-}
-
-bool App::save_playlist_to_file(const std::string& uid) {
-    Playlist* playlist = get_playlist(uid);
-
-    if(!playlist) return false;
-
-    return playlist->save_to_file(get_playlist_path(uid));
-}
-
-Playlist* App::get_playlist(const std::string& uid) {
-    auto it = playlists.find(uid);
-    if (it != playlists.end()) return it->second;
-
-    return nullptr;
-}
-
-void App::delete_playlist(const std::string& uid) {
-    auto play = get_playlist(uid);
-
-    if(!play) return;
-
-    delete play;
-
-    auto play_path = get_playlist_path(uid);
-
-    playlists.erase(playlists.find(uid));
-
-    if(fs::remove(play_path))
-        Logger::get_instance().log_warn("[Playlist Bank] succesfully removed playlist '" + play_path.string() + "'");
-    else 
-        Logger::get_instance().log_err("[Playlist Bank] impossible to remove playlist '" + play_path.string() + "'");
-}
-
-void App::delete_playlist(Playlist* play) {
-
-}
-
-void App::clear_playlists() {
-    for(const auto& i : playlists)
-        delete i.second;
-    
-    playlists.clear();
-}
-
-bool App::playlist_exists(const std::string& name) const {
-    for(const auto& p : playlists) {
-        if(p.second->get_name() == name) return true;
-    }
-
-    return false;
-}
-
-std::vector<Playlist*> App::get_playlists() {
-    std::vector<Playlist*> ret;
-
-    for(const auto& p : playlists) {
-        ret.push_back(p.second);
-    }
-
-    return ret;
-}
-
-fs::path App::get_playlist_path(Playlist* playlist) const {
-    auto it = std::find_if(playlists.begin(), playlists.end(), 
-        [&playlist](const auto& pair) {
-            return pair.second == playlist;
-        });
-
-    if (it != playlists.end()) {
-        return fs::path(playlist_bank_path) / fs::path(it->first + ".json");
-    } else return fs::path();
-}
-
-fs::path App::get_playlist_path(const std::string& uid) const {
-    auto it = playlists.find(uid);
-
-    if(it != playlists.end())
-        return fs::path(playlist_bank_path) / fs::path(uid + ".json");
-    
-    return fs::path();
-}
-
-const std::string App::get_playlist_uid(Playlist* playlist) const {
-    auto it = std::find_if(playlists.begin(), playlists.end(), 
-        [&playlist](const auto& pair) {
-            return pair.second == playlist;
-        });
-
-    if (it != playlists.end()) {
-        return it->first;
-    } else return "";
-}
-
-std::vector<Song*> App::get_songs_in_playlist(Playlist* playlist) {
-    std::vector<Song*> ret;
-
-    for(const auto& s : playlist->get_songs()) {
-        Song* song = song_bank.get_song(s);
-
-        if(song)
-            ret.push_back(song);
+        ret.failed = true;
+        return ret;
     }
 
     return ret;
@@ -286,10 +149,8 @@ void App::main_loop() {
                     break;
                 case 7:
                     Logger::get_instance().log(">>> RELOADING SONGS & PLAYLISTS...");
-                    clear_playlists();
-                    song_bank.clear();
-                    song_bank.load_all(song_bank_path);
-                    load_all_playlists(playlist_bank_path);
+                    song_bank.reload_all();
+                    play_bank.reload_all(&song_bank);
                     break;
                 case 8:
                     song_delete();
@@ -414,11 +275,11 @@ void App::show_log() {
 }
 
 void App::playlist_selection() {
-    if(playlists.empty()) return;
+    if(play_bank.empty()) return;
 
     std::vector<std::string> options;
 
-    std::vector<Playlist*> playlist_arr = get_playlists();
+    std::vector<Playlist*> playlist_arr = play_bank.get_playlists();
 
     for(const auto p : playlist_arr)
         options.push_back(p->get_name());
@@ -429,7 +290,7 @@ void App::playlist_selection() {
 
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            song_queue_play_screen(get_songs_in_playlist(playlist_arr[menu.get_selected_id()]));
+            song_queue_play_screen(play_bank.get_songs_in_playlist(playlist_arr[menu.get_selected_id()], &song_bank));
             return true;
         }
         return false;
@@ -960,11 +821,11 @@ void App::song_creation(Song* edit_song) {
         if (song_bank.song_exists_by_name(nome_canzone)) {
             if (edit_song) {
                 if (edit_song->get_name() != nome_canzone) {
-                    Logger::get_instance().log_err("[SongEditor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
+                    Logger::get_instance().log_err("[Song Editor] unable to edit song '" + edit_song->get_name() + "' with new name '" + nome_canzone + "' since it already exists");
                     return;
                 }
             } else {
-                Logger::get_instance().log_err("[SongEditor] unable to create song '" + nome_canzone + "' since it already exists");
+                Logger::get_instance().log_err("[Song Editor] unable to create song '" + nome_canzone + "' since it already exists");
                 return;
             }
         }
@@ -993,9 +854,9 @@ void App::song_creation(Song* edit_song) {
         }
 
         if (!song_bank.save_song_to_file(song_uid))
-            Logger::get_instance().log_err("[SongEditor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
+            Logger::get_instance().log_err("[Song Editor] unable to save song '" + nome_canzone + "'. All changes will be discarded");
         else
-            Logger::get_instance().log(((edit_song) ? "[SongEditor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
+            Logger::get_instance().log(((edit_song) ? "[Song Editor]>>> Edited new song '" : ">>> Created new song '") + nome_canzone + "'");
 
         screen.ExitLoopClosure()();
     };
@@ -1086,13 +947,14 @@ void App::song_creation(Song* edit_song) {
 }
 
 void App::song_editing() {
-    std::vector<Song*> songs = song_bank.get_songs();
+    std::vector<Song*> songs;
 
     if(songs.empty()) return;
 
     std::vector<std::string> options;
 
     auto load_songs = [&] {
+        songs = song_bank.get_songs();
         options.clear();
 
         for(const auto s : songs) {
@@ -1128,13 +990,14 @@ void App::song_editing() {
 }
 
 void App::song_delete() {
-    std::vector<Song*> songs = song_bank.get_songs();
+    std::vector<Song*> songs;
 
     if(songs.empty()) return;
 
     std::vector<std::string> options;
 
     auto load_songs = [&] {
+        songs = song_bank.get_songs();
         options.clear();
 
         for(const auto s : songs) {
@@ -1156,6 +1019,7 @@ void App::song_delete() {
             if(confirm_dialog("Are you sure you want to delete\nthe song '" + song->get_name() + "' ?")) {
                 song_bank.delete_song(song);
                 load_songs();
+                menu.set_options(options);
             }
 
             return true;
@@ -1275,14 +1139,14 @@ void App::playlist_creation(Playlist* edit_playlist) {
     auto on_salva_click = [&] {
         if(canzoni_playlist.empty() || nome_playlist.empty()) return;
 
-        if(playlist_exists(nome_playlist)) {
+        if(play_bank.playlist_exists(nome_playlist)) {
             if(edit_playlist) {
                 if(edit_playlist->get_name() != nome_playlist) {
-                    Logger::get_instance().log_err("[PlaylistEditor] unable to edit playlist '" + edit_playlist->get_name() + "' with new name '" + nome_playlist + "' since it already exists");
+                    Logger::get_instance().log_err("[Playlist Editor] unable to edit playlist '" + edit_playlist->get_name() + "' with new name '" + nome_playlist + "' since it already exists");
                     return;
                 }
             } else {
-                Logger::get_instance().log_err("[PlaylistEditor] unable to create new playlist '" + nome_playlist + "' since it already exists");
+                Logger::get_instance().log_err("[Playlist Editor] unable to create new playlist '" + nome_playlist + "' since it already exists");
                 return;
             }
         }
@@ -1292,11 +1156,11 @@ void App::playlist_creation(Playlist* edit_playlist) {
 
         if(edit_playlist) {
             new_playlist = edit_playlist;
-            playlist_uid = get_playlist_uid(edit_playlist);
+            playlist_uid = play_bank.get_playlist_uid(edit_playlist);
 
             edit_playlist->clear_songs();
         } else {
-            std::pair<std::string, Playlist*> new_playlist_and_uid = create_playlist();
+            std::pair<std::string, Playlist*> new_playlist_and_uid = play_bank.create_playlist();
 
             new_playlist = new_playlist_and_uid.second;
             playlist_uid = new_playlist_and_uid.first;
@@ -1309,10 +1173,10 @@ void App::playlist_creation(Playlist* edit_playlist) {
             new_playlist->add_song(song_bank.get_song_uid(entry.canzone));
         }
 
-        if(!save_playlist_to_file(playlist_uid))
-            Logger::get_instance().log_err("[PlaylistEditor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
+        if(!play_bank.save_playlist_to_file(playlist_uid))
+            Logger::get_instance().log_err("[Playlist Editor]>>> Unable to create playlist '" + nome_playlist + "'. All changes will be discarded");
         else
-            Logger::get_instance().log("[PlaylistEditor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
+            Logger::get_instance().log("[Playlist Editor]>>> " + std::string((edit_playlist) ? "Edited" : "Created") + " new playlist '" + nome_playlist + "'");
 
         screen.ExitLoopClosure()();
     };
@@ -1394,13 +1258,14 @@ void App::playlist_creation(Playlist* edit_playlist) {
 }
 
 void App::playlist_editing() {
-    std::vector<Playlist*> playlists = get_playlists();
+    if(play_bank.empty()) return;
 
-    if(playlists.empty()) return;
+    std::vector<Playlist*> playlists;
 
     std::vector<std::string> options;
 
     auto load_playlists = [&] {
+        playlists = play_bank.get_playlists();
         options.clear();
 
         for(const auto s : playlists) {
@@ -1427,14 +1292,16 @@ void App::playlist_editing() {
 }
 
 void App::playlist_delete() {
-    std::vector<Playlist*> playlists = get_playlists();
+    if(play_bank.empty()) return;
 
-    if(playlists.empty()) return;
+    std::vector<Playlist*> playlists;
 
     std::vector<std::string> options;
 
     auto load_playlists = [&] {
         options.clear();
+
+        playlists = play_bank.get_playlists();
 
         for(const auto s : playlists) {
             options.push_back(s->get_name());
@@ -1450,11 +1317,23 @@ void App::playlist_delete() {
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
             
-            Playlist* play = playlists[menu.get_selected_id()];
+            Playlist* play;
+
+            if(!playlists.empty()) {
+                play = playlists[menu.get_selected_id()];
+            } else return true;
 
             if(confirm_dialog("Are you sure you want to delete\nthe playlist '" + play->get_name() + "' ?")) {
-                delete_playlist(play);
+                play_bank.delete_playlist(play);
                 load_playlists();
+
+                if(options.empty()) {
+                    menu.get_screen().ExitLoopClosure()();
+                    return true;
+                }
+
+                menu.set_selected(0);
+                menu.set_options(options);
             }
 
             return true;
