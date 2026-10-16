@@ -51,8 +51,6 @@ size_t AudioPlayer::get_device_audio_out_count(const std::string& id) {
     BASS_INFO info;
     BASS_GetInfo(&info);
 
-    BASS_Free();
-
     release_device(id);
 
     return std::floor(info.speakers / 2);
@@ -306,9 +304,9 @@ void AudioPlayer::play(int song_id) {
 
     Song* current_song = queued_songs[song_id];
 
-    if(!load_song(current_song)) return;
-
     playing_song = song_id;
+
+    if(!load_song(current_song)) return;
 
     paused = false;
 

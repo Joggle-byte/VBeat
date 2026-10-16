@@ -81,8 +81,8 @@ ConfigFile App::load_config_file() {
 bool App::wipe_memory() {
     Logger::get_instance().log_warn("[VBeat]>>> Wiping song bank and playlist bank");
 
-    std::vector<fs::path> all_songs = get_files_by_extension(fs::path(song_bank_path), ".json");
-    std::vector<fs::path> all_playlists = get_files_by_extension(fs::path(playlist_bank_path), ".json");
+    std::vector<fs::path> all_songs = get_files_by_extension(fs::path(song_bank.get_path()), ".json");
+    std::vector<fs::path> all_playlists = get_files_by_extension(fs::path(play_bank.get_path()), ".json");
 
     if(all_songs.empty()) {
         Logger::get_instance().log_err("[VBeat] song bank is empty. Aborting memory wipe");
@@ -397,7 +397,6 @@ void App::song_play_screen(Song* song) {
         main_player.pause();
     };
     auto on_stop = [&] {
-        main_player.stop();
         screen.ExitLoopClosure()();
     };
 
@@ -557,7 +556,6 @@ void App::song_play_screen(Song* song) {
         return false;
     });
 
-
     auto controlli = ui::Container::Vertical({
         seek_catcher,
         lista_bus_scrollabile,
@@ -580,7 +578,7 @@ void App::song_play_screen(Song* song) {
         marker_idx.push_back(-1);
 
         for(const auto& i : marker_layout) {
-            int idx = static_cast<int>(std::floor((i.get_timestamp() / progresso.second) * width));
+            int idx = std::clamp(static_cast<int>(std::floor((i.get_timestamp() / progresso.second) * (width - 1))), 0, width - 1);
             buffer[idx] = '|';
 
             marker_idx.push_back(idx);
@@ -774,11 +772,8 @@ void App::song_creation(Song* edit_song) {
 
         auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
 
-        // Dropdown dell'USCITA (non più del device): referenzia la lista
-        // condivisa `uscita_labels`, che viene rigenerata ogni frame.
         auto dropdown_uscita = ui::Dropdown(&uscita_labels, &stato.output_index);
 
-        // --- DELETE BUTTON (invariato) -----------------------------------
         auto self_weak_box = std::make_shared<std::weak_ptr<ui::ComponentBase>>();
 
         auto btn_elimina = ui::Button("🗑 Delete", [self_weak_box, it, &tracce] {

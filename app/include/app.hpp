@@ -34,9 +34,6 @@ private:
 
     AudioPlayer main_player;
 
-    std::string song_bank_path;
-    std::string playlist_bank_path;
-
     /* GUI */
 
     const int screen_width = 800;
