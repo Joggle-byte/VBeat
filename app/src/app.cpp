@@ -341,6 +341,8 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
             main_player.play(menu.get_selected_id());
             song_play_screen(main_player.get_current_song());
             
+            main_player.stop();
+
             load_songs();
             menu.set_options(options);
             menu.set_selected(main_player.select_next_song_looped());
@@ -1047,18 +1049,6 @@ void App::song_delete() {
 }
 
 
-// Marker editor: riproduci la canzone come riferimento, mettila in pausa dove
-// serve e premi "+ Add Marker" per inserire un marker al timestamp corrente.
-//
-// Include necessari oltre ai tuoi:
-//   <algorithm> <cctype> <cmath> <cstdio> <list> <memory> <string> <utility> <vector>
-//
-// ASSUNZIONI (correggile se non combaciano col tuo backend):
-//   - come in song_play_screen(), la riproduzione viene avviata DAL CHIAMANTE:
-//     questa funzione non carica/avvia nulla, usa solo resume/pause/stop e
-//     set_playback_pos;
-//   - all'uscita (Save o Cancel) chiamo main_player.stop().
-
 struct UIMarker {
     std::string marker_name;
     std::string marker_timestamp;   // formato "MM:SS"
@@ -1066,6 +1056,16 @@ struct UIMarker {
 
 void App::marker_editing(Song* song) {
     if(!song) return;
+
+    // Canzone corrotta/degradata: NON va caricata né riprodotta. L'editor
+    // mostra e permette di modificare SOLO la lista dei marker (niente barra di
+    // avanzamento, barra dei marker, play/pausa).
+    const bool markers_only = song->is_corrupted() || song->is_degraded();
+
+    std::string avviso_markers_only;
+    if (markers_only)
+        avviso_markers_only = std::string("⚠ ") + (song->is_corrupted() ? "CORRUPTED" : "DEGRADED")
+                            + " song: playback disabled, markers only";
 
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -1105,9 +1105,11 @@ void App::marker_editing(Song* song) {
     };
 
     // --- Stato playback ------------------------------------------------------
+    // In modalità markers_only il player non viene mai interrogato:
+    // progresso resta (0, 0) e longest_bus non viene usato.
 
     std::pair<double, double> progresso(0.0, 0.0);   // (posizione, durata)
-    int longest_bus = main_player.get_longest_bus_id();
+    int longest_bus = markers_only ? -1 : main_player.get_longest_bus_id();
     bool is_first_frame = true;
 
     // --- Stato dei marker ----------------------------------------------------
@@ -1124,6 +1126,14 @@ void App::marker_editing(Song* song) {
     auto segna_modificato = [&] {
         markers_dirty = true;
         errore.clear();
+    };
+
+    // Chiusura dell'editor. In markers_only nessuna riproduzione è stata
+    // avviata da qui, quindi non si tocca il player.
+    auto chiudi_editor = [&] {
+        if (!markers_only)
+            main_player.stop();
+        screen.ExitLoopClosure()();
     };
 
     // --- Slider di progresso (seek) -----------------------------------------
@@ -1239,7 +1249,12 @@ void App::marker_editing(Song* song) {
                 // timestamp non valido -> in rosso
                 float timestamp_seconds = timestamp_to_seconds(stato.marker_timestamp);
 
-                if (timestamp_seconds < 0.0f || timestamp_seconds > progresso.second)
+                // La durata è nota solo con la canzone caricata: in markers_only
+                // progresso.second resta 0 e NON va usata come limite, altrimenti
+                // ogni timestamp risulterebbe "oltre la fine".
+                bool oltre_durata = progresso.second > 0.0 && timestamp_seconds > progresso.second;
+
+                if (timestamp_seconds < 0.0f || oltre_durata)
                     ts_el = ts_el | ui::color(ui::Color::Red);
 
                 return ui::hbox({
@@ -1264,7 +1279,8 @@ void App::marker_editing(Song* song) {
         segna_modificato();
     };
 
-    // Il bottone inserisce un marker alla posizione corrente della canzone.
+    // Il bottone inserisce un marker alla posizione corrente della canzone
+    // (in markers_only la posizione è sempre 00:00: si modifica a mano).
     auto on_aggiungi_click = [&] {
         aggiungi_marker("Marker " + std::to_string(prossimo_numero_marker++),
                         seconds_to_timestamp(progresso.first));
@@ -1315,8 +1331,7 @@ void App::marker_editing(Song* song) {
         if(song_uid.empty()) {
             Logger::get_instance().log_err("[Marker Editor] unable to save song '" + song->get_name() + "' since it does not exist in song bank. All changes will be discarded");
 
-            main_player.stop();
-            screen.ExitLoopClosure()();
+            chiudi_editor();
             return;
         }
 
@@ -1325,13 +1340,11 @@ void App::marker_editing(Song* song) {
         else
             Logger::get_instance().log("[Marker Editor]>>> Edited markers in song '" + song->get_name() + "'");
 
-        main_player.stop();
-        screen.ExitLoopClosure()();
+        chiudi_editor();
     };
 
     auto on_annulla_click = [&] {
-        main_player.stop();
-        screen.ExitLoopClosure()();
+        chiudi_editor();
     };
 
     ui::ButtonOption stile_salva;
@@ -1359,14 +1372,20 @@ void App::marker_editing(Song* song) {
     });
 
     // --- Albero dei componenti -----------------------------------------------
+    // In markers_only slider e play/pausa NON entrano nell'albero: così non
+    // possono ricevere focus né eventi (un Invio su un "Play" invisibile
+    // chiamerebbe resume() su una canzone mai caricata).
 
-    auto layout_principale = ui::Container::Vertical({
-        seek_catcher,
-        pulsanti_riproduzione,
-        btn_aggiungi,
-        container_marker,
-        bottoni_finali,
-    });
+    auto layout_principale = ui::Container::Vertical({});
+
+    if (!markers_only) {
+        layout_principale->Add(seek_catcher);
+        layout_principale->Add(pulsanti_riproduzione);
+    }
+
+    layout_principale->Add(btn_aggiungi);
+    layout_principale->Add(container_marker);
+    layout_principale->Add(bottoni_finali);
 
     // --- Barra dei marker -----------------------------------------------------
     // Ricostruita SOLO quando serve (vedi renderer): marker modificati,
@@ -1426,71 +1445,81 @@ void App::marker_editing(Song* song) {
     // --- Renderer -------------------------------------------------------------
 
     auto renderer = ui::Renderer(layout_principale, [&] {
-        if (!is_seeking)
-            progresso = main_player.get_bus_playback_info(longest_bus);
+        ui::Elements contenuto;
 
-        if (main_player.is_playing())
-            ui::animation::RequestAnimationFrame();
+        contenuto.push_back(ui::text("Marker Editor - " + titolo_brano) | ui::bold | ui::center);
+        contenuto.push_back(ui::separatorEmpty());
 
-        // Al primo frame slider_box non è ancora popolato da reflect(): chiedi
-        // un secondo frame così la barra dei marker si costruisce subito,
-        // anche con la canzone in pausa.
-        if (is_first_frame) {
-            is_first_frame = false;
-            ui::animation::RequestAnimationFrame();
+        if (markers_only) {
+            contenuto.push_back(ui::text(avviso_markers_only) | ui::center | ui::color(ui::Color::Yellow));
+            contenuto.push_back(ui::separator());
+        } else {
+            // --- Parte "player": solo con la canzone caricata -----------------
+            if (!is_seeking)
+                progresso = main_player.get_bus_playback_info(longest_bus);
+
+            if (main_player.is_playing())
+                ui::animation::RequestAnimationFrame();
+
+            if (is_first_frame) {
+                is_first_frame = false;
+                ui::animation::RequestAnimationFrame();
+            }
+
+            int width = slider_box.x_max - slider_box.x_min + 1;
+            if (markers_dirty || width != last_bar_width || progresso.second != last_bar_duration) {
+                build_marker_line();
+                last_bar_width = width;
+                last_bar_duration = progresso.second;
+                markers_dirty = false;
+            }
+
+            std::string stato = main_player.is_paused() ? "Paused"
+                              : (main_player.is_playing() ? "Playing" : "Stopped");
+
+            contenuto.insert(contenuto.end(), {
+                ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight) | ui::color(ui::Color::Black),
+                seek_catcher->Render() | ui::reflect(slider_box),
+
+                ui::separatorEmpty(),
+
+                ui::text(seconds_to_timestamp(progresso.first) + " | " + seconds_to_timestamp(progresso.second))
+                    | ui::center,
+
+                ui::separatorEmpty(),
+
+                ui::hbox({
+                    ui::filler(),
+                    btn_play->Render(),
+                    ui::text(" "),
+                    btn_pause->Render(),
+                    ui::filler(),
+                }),
+
+                ui::text("State: " + stato) | ui::center | ui::dim,
+
+                ui::separator(),
+            });
         }
 
-        int width = slider_box.x_max - slider_box.x_min + 1;
-        if (markers_dirty || width != last_bar_width || progresso.second != last_bar_duration) {
-            build_marker_line();
-            last_bar_width = width;
-            last_bar_duration = progresso.second;
-            markers_dirty = false;
-        }
+        // --- Sezione marker: comune a entrambe le modalità --------------------
+        contenuto.insert(contenuto.end(), {
+            ui::hbox({
+                ui::text("Markers") | ui::bold,
+                ui::filler(),
+                btn_aggiungi->Render(),
+            }),
+            ui::separator(),
 
-        std::string stato = main_player.is_paused() ? "Paused"
-                          : (main_player.is_playing() ? "Playing" : "Stopped");
+            container_marker->Render() | ui::vscroll_indicator | ui::frame |
+                ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
 
-        return ui::vbox({
-                   ui::text("Marker Editor - " + titolo_brano) | ui::bold | ui::center,
-                   ui::separatorEmpty(),
+            ui::separator(),
+            bottoni_finali->Render() | ui::center,
+            ui::text(errore) | ui::color(ui::Color::Red) | ui::center,
+        });
 
-                   ui::text(marker_line) | ui::bold | ui::bgcolor(ui::Color::GreenLight) | ui::color(ui::Color::Black),
-                   seek_catcher->Render() | ui::reflect(slider_box),
-
-                   ui::separatorEmpty(),
-
-                   ui::text(seconds_to_timestamp(progresso.first) + " | " + seconds_to_timestamp(progresso.second))
-                       | ui::center,
-
-                   ui::separatorEmpty(),
-
-                   ui::hbox({
-                       ui::filler(),
-                       btn_play->Render(),
-                       ui::text(" "),
-                       btn_pause->Render(),
-                       ui::filler(),
-                   }),
-
-                   ui::text("State: " + stato) | ui::center | ui::dim,
-
-                   ui::separator(),
-
-                   ui::hbox({
-                       ui::text("Markers") | ui::bold,
-                       ui::filler(),
-                       btn_aggiungi->Render(),
-                   }),
-                   ui::separator(),
-
-                   container_marker->Render() | ui::vscroll_indicator | ui::frame |
-                       ui::size(ui::HEIGHT, ui::LESS_THAN, 20),
-
-                   ui::separator(),
-                   bottoni_finali->Render() | ui::center,
-                   ui::text(errore) | ui::color(ui::Color::Red) | ui::center,
-               }) |
+        return ui::vbox(std::move(contenuto)) |
                ui::size(ui::WIDTH, ui::GREATER_THAN, 60) |
                ui::border;
     });
@@ -1501,9 +1530,9 @@ void App::marker_editing(Song* song) {
 void App::marker_editing_selection() {
     if(song_bank.empty()) return;
 
-    std::vector<Song*> songs = song_bank.get_songs();
+    main_player.clear_queue();
 
-    main_player.set_queue(songs);
+    std::vector<Song*> songs = song_bank.get_songs();
 
     std::vector<std::string> options;
 
@@ -1532,8 +1561,17 @@ void App::marker_editing_selection() {
 
     menu.render([&] (ui::Event event) {
         if(event == ui::Event::Return) {
-            main_player.play(menu.get_selected_id());
-            marker_editing(main_player.get_current_song());
+            main_player.set_queue({songs[menu.get_selected_id()]});
+
+            Song* s = main_player.get_queued_song(0);
+
+            if(!s->is_corrupted() && !s->is_degraded()) {
+                main_player.play(0);
+            }
+
+            marker_editing(s);
+
+            main_player.clear_queue();
 
             load_songs();
             menu.set_options(options);

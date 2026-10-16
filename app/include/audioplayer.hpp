@@ -107,6 +107,8 @@ private:
     void clear_busses();
     int create_bus();
 
+    void free_mixer();
+
     bool load_song(Song* new_song, bool verbose = true);
 
     void set_volume(int bus_id, float vol);
