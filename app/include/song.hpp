@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 enum class SongState {
     OK,
     DEGRADED,
-    CORRUPTED
+    CORRUPTED,
 };
 
 

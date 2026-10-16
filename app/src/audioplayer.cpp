@@ -206,6 +206,8 @@ std::vector<Marker> AudioPlayer::get_current_marker_layout() {
 bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     if(!new_song) return false;
 
+    if(new_song->is_corrupted()) return false;
+
     if(verbose) Logger::get_instance().log("[AudioPlayer] loading song '" + new_song->get_name() + "'...");
 
 
@@ -220,9 +222,7 @@ bool AudioPlayer::load_song(Song* new_song, bool verbose) {
     }
 
     // Mixer init
-    if(mixer) {
-        BASS_StreamFree(mixer);
-    }
+    free_mixer();
 
     BASS_INFO info;
     BASS_GetInfo(&info);
@@ -286,6 +286,13 @@ void AudioPlayer::clear_busses() {
     busses.clear();
 }
 
+void AudioPlayer::free_mixer() {
+    if(mixer) {
+        BASS_StreamFree(mixer);
+        mixer = 0;
+    }
+}
+
 // ===========================================================================
 
 
@@ -297,11 +304,11 @@ void AudioPlayer::play(int song_id) {
         return;
     }
 
-    playing_song = song_id;
-
-    Song* current_song = queued_songs[playing_song];
+    Song* current_song = queued_songs[song_id];
 
     if(!load_song(current_song)) return;
+
+    playing_song = song_id;
 
     paused = false;
 
@@ -316,18 +323,27 @@ void AudioPlayer::play_current() {
 
 
 void AudioPlayer::pause() {
+    if(paused || !mixer) return;
+
     paused = true;
     BASS_ChannelPause(mixer);
 }
 
 void AudioPlayer::resume() {
+    if(!paused || !mixer) return;
+
     paused = false;
     BASS_ChannelPlay(mixer, FALSE);
 }
 
 void AudioPlayer::stop() {
+    if(!mixer) return;
+
     paused = false;
     BASS_ChannelStop(mixer);
+
+    free_mixer();
+    clear_busses();
 }
 
 void AudioPlayer::set_playback_pos(double seconds) {
@@ -422,6 +438,8 @@ Song* AudioPlayer::get_next_song_looped() const {
 
 
 bool AudioPlayer::is_playing() {
+    if(!mixer) return false;
+
     bool ret = false;
     for(size_t i = 0; i < bus_count(); i++) {
         ret |= busses[i].is_playing();
