@@ -86,12 +86,13 @@ Song* Song::create_from_file(const fs::path& path) {
         new_song->device_id = data["device"];
 
         for(const auto& track : data["tracks"]) {
-            new_song->add_track({
+            new_song->add_track(AudioTrack(
                 track["name"],
                 track["path"],
                 track["volume"],
-                track["channel"]
-            });
+                track["channel"],
+                track["muted"]
+            ));
         }
 
         if(data.contains("markers")) {
@@ -126,6 +127,7 @@ bool Song::save_to_file(const fs::path& path) {
         track["path"] = t.file_path;
         track["volume"] = t.volume;
         track["channel"] = t.channel_index;
+        track["muted"] = t.muted;
         
         j["tracks"].push_back(track);
     }

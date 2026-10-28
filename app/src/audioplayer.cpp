@@ -484,6 +484,21 @@ AudioBus* AudioPlayer::get_bus(int bus_id) {
     if(is_valid_bus(bus_id)) return &busses[bus_id];
     return nullptr;
 }
+    
+void AudioPlayer::set_bus_muted(int bus_id, bool do_mute) {
+    auto bus = get_bus(bus_id);
+    if(!bus) return;
+
+    if(do_mute) bus->mute();
+    else bus->unmute();
+}
+
+bool AudioPlayer::is_bus_muted(int bus_id) {
+    auto bus = get_bus(bus_id);
+    if(!bus) return false;
+
+    return bus->is_muted();
+}
 
 std::vector<std::pair<float, float>> AudioPlayer::get_bus_levels() {
     std::vector<std::pair<float, float>> ret;

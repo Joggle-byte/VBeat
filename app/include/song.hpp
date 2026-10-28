@@ -75,12 +75,13 @@ public:
 
 
 private:
-    std::string name;
-    std::vector<AudioTrack> tracks;
-    std::string device_id;
     SongState state;
 
     std::map<float, Marker> markers;
+    std::vector<AudioTrack> tracks;
+
+    std::string device_id;
+    std::string name;
 
     bool is_valid_track_id(int track_id) const;
 };
