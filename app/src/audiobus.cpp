@@ -82,8 +82,9 @@ bool AudioBus::load(const AudioTrack& new_track, bool verbose) {
         return false;
     }
 
-    set_volume(new_track.volume);
-
+    if(new_track.muted) mute();
+    else set_volume(new_track.volume);
+    
     if(!generate_channel_map(track.channel_index, info.speakers)) {
         return false;
     }
@@ -121,10 +122,12 @@ void AudioBus::set_volume(float vol) {
 }
 
 void AudioBus::mute() {
+    muted = true;
     set_volume(0.0f);
 }
 
 void AudioBus::unmute() {
+    muted = false;
     set_volume(track.volume);
 }
 

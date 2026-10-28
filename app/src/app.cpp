@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include <list>
+#include <deque>
 
 #include "../include/app.hpp"
 #include "../include/utils.hpp"
@@ -391,7 +392,6 @@ void App::song_queue_play_screen(const std::vector<Song*> queue) {
     }, true);
 }
 
-
 void App::song_play_screen(Song* song) {
     auto screen = ui::ScreenInteractive::TerminalOutput();
 
@@ -533,45 +533,83 @@ void App::song_play_screen(Song* song) {
         return std::to_string(first) + "-" + std::to_string(first + 1);
     };
 
+    std::deque<bool> bus_muted;
+    for (size_t i = 0; i < main_player.bus_count(); i++)
+        bus_muted.push_back(main_player.is_bus_muted(static_cast<int>(i)));
+
+    std::vector<std::pair<float, float>> bus_levels;
+
+    auto crea_riga_bus = [&](int i) -> ui::Component {
+        ui::ButtonOption opzioni_mute;
+        opzioni_mute.transform = [&bus_muted, i](const ui::EntryState& state) {
+            const bool muted = bus_muted[i];
+            ui::Element e = ui::text(muted ? "[ MUTED ]" : "[ Mute ]") | ui::size(ui::WIDTH, ui::EQUAL, 9);
+
+            if (muted && state.focused)
+                e = e | ui::bgcolor(ui::Color::RedLight) | ui::color(ui::Color::White) | ui::bold;
+            else if (muted)
+                e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+            else if (state.focused)
+                e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+
+            return e;
+        };
+
+        auto btn_mute = ui::Button("Mute", [&, i] {
+            bus_muted[i] = !bus_muted[i];
+            main_player.set_bus_muted(i, bus_muted[i]);
+        }, opzioni_mute);
+
+        return ui::Renderer(btn_mute, [&, i, btn_mute] {
+            const AudioTrack& track = main_player.get_bus(i)->get_track();
+            const bool muted = bus_muted[i];
+
+            float level_l = 0.0f;
+            float level_r = 0.0f;
+            if (static_cast<size_t>(i) < bus_levels.size()) {
+                level_l = bus_levels[i].first;
+                level_r = bus_levels[i].second;
+            }
+
+            ui::Color colore_gauge = muted ? ui::Color::GrayDark : ui::Color::Cyan;
+
+            ui::Element nome = ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 20);
+            if (muted)
+                nome = nome | ui::dim;
+
+            return ui::hbox({
+                nome,
+                ui::text(" → " + get_channel_name_from_index(track.channel_index)) | ui::size(ui::WIDTH, ui::EQUAL, 10) | ui::dim,
+                btn_mute->Render() | ui::vcenter,
+                ui::separatorEmpty(),
+                ui::vbox({
+                    ui::gauge(level_l) | ui::color(colore_gauge),
+                    ui::separatorEmpty(),
+                    ui::gauge(level_r) | ui::color(colore_gauge),
+                    ui::separatorEmpty(),
+                }) | ui::flex,
+                ui::filler() | ui::flex,
+
+                ui::separator(),
+            });
+        });
+    };
+
+    std::vector<ui::Component> righe_bus;
+    for (size_t i = 0; i < main_player.bus_count(); i++)
+        righe_bus.push_back(crea_riga_bus(static_cast<int>(i)));
+
+    auto container_bus = ui::Container::Vertical(righe_bus);
+
 
     int bus_scroll_offset = 0;
     ui::Box bus_list_box;
 
-    auto lista_bus_component = ui::Renderer([&] {
-        ui::Elements bus_rows;
-
-        if (main_player.is_playing()) {
-            auto bus_levels = main_player.get_bus_levels();
-
-            for (size_t i = 0; i < main_player.bus_count(); i++) {
-                const AudioTrack& track = main_player.get_bus(i)->get_track();
-                std::string bus_channel;
-
-                bus_channel = get_channel_name_from_index(track.channel_index);
-
-                bus_rows.push_back(
-                    ui::hbox({
-                        ui::text(std::to_string(i + 1) + ". " + track.name) | ui::size(ui::WIDTH, ui::EQUAL, 20),
-                        ui::text(" → " + bus_channel) | ui::size(ui::WIDTH, ui::EQUAL, 10) | ui::dim,
-                        ui::separatorEmpty(),
-                        ui::vbox({
-                            ui::gauge(bus_levels[i].first) | ui::color(ui::Color::Cyan),
-                            ui::separatorEmpty(),
-                            ui::gauge(bus_levels[i].second) | ui::color(ui::Color::Cyan),
-                            ui::separatorEmpty(),
-                        }) | ui::flex,
-                        ui::filler() | ui::flex,
-
-                        ui::separator(),
-                    })
-                );
-            }
-        }
-
-        return ui::vbox(std::move(bus_rows))
-            | ui::focusPosition(0, bus_scroll_offset)  // scorri per mostrare questa riga
-            | ui::vscroll_indicator                     // la "sidebar" con la barra
-            | ui::frame                                 // clippa + abilita lo scroll
+    auto lista_bus_component = ui::Renderer(container_bus, [&] {
+        return container_bus->Render()
+            | ui::focusPosition(0, bus_scroll_offset)
+            | ui::vscroll_indicator                     
+            | ui::frame                                
             | ui::size(ui::HEIGHT, ui::LESS_THAN, 18);   // altezza massima visibile
     });
 
@@ -673,6 +711,11 @@ void App::song_play_screen(Song* song) {
         } else if (!main_player.is_paused()) {
             screen.ExitLoopClosure()();
         }
+
+        if (main_player.is_playing())
+            bus_levels = main_player.get_bus_levels();
+        else
+            bus_levels.clear();
 
         if(!is_first_frame) build_marker_line();
 
@@ -797,6 +840,21 @@ void App::song_creation(Song* edit_song) {
     std::list<UITrack> tracce;
     auto container_tracce = ui::Container::Vertical({});
 
+    ui::CheckboxOption opzioni_mute;
+    opzioni_mute.transform = [](const ui::EntryState& state) {
+        const bool muted = state.state;   // state.state = checkbox spuntata
+        ui::Element e = ui::text(muted ? "[ MUTED ]" : "[ Mute ]") | ui::size(ui::WIDTH, ui::EQUAL, 9);
+
+        if (muted && state.focused)
+            e = e | ui::bgcolor(ui::Color::RedLight) | ui::color(ui::Color::White) | ui::bold;
+        else if (muted)
+            e = e | ui::bgcolor(ui::Color::Red) | ui::color(ui::Color::White);
+        else if (state.focused)
+            e = e | ui::bgcolor(ui::Color::CornflowerBlue) | ui::color(ui::Color::White);
+
+        return e;
+    };
+
     auto crea_ui_traccia = [&](std::list<UITrack>::iterator it) -> ui::Component {
         UITrack& stato = *it;
 
@@ -808,6 +866,8 @@ void App::song_creation(Song* edit_song) {
         opzioni_volume.max = 2.0f;
         opzioni_volume.increment = 0.05f;
         auto slider_volume = ui::Slider<float>(opzioni_volume);
+
+        auto check_mute = ui::Checkbox("Mute", &stato.data.muted, opzioni_mute);
 
         auto input_percorso = ui::Input(&stato.data.file_path, "File path...");
 
@@ -823,19 +883,21 @@ void App::song_creation(Song* edit_song) {
 
         auto gruppo = ui::Container::Vertical({
             input_nome,
-            input_percorso,
             slider_volume,
+            check_mute,
+            input_percorso,
             dropdown_uscita,
             btn_elimina
         });
 
         ui::Component componente = ui::Renderer(gruppo, [&stato, input_nome, slider_volume,
-                                                   input_percorso, dropdown_uscita,
+                                                   check_mute, input_percorso, dropdown_uscita,
                                                    btn_elimina] {
             return ui::vbox({
                        ui::hbox(ui::text("Name:    ") | ui::dim, input_nome->Render()),
                        ui::hbox(ui::text("Volume:  ") | ui::dim, slider_volume->Render() | ui::flex,
-                            ui::text(" " + std::to_string(stato.data.volume))),
+                            ui::text(" " + std::to_string(stato.data.volume) + "  "),
+                            check_mute->Render()),
                        ui::hbox(ui::text("File:    ") | ui::dim, input_percorso->Render()),
                        ui::hbox(ui::text("Output:  ") | ui::dim, dropdown_uscita->Render()),
                        ui::separator(),
@@ -934,7 +996,7 @@ void App::song_creation(Song* edit_song) {
 
     auto layout_principale = ui::Container::Vertical({
         input_nome_canzone,
-        dropdown_device_canzone,   // <-- nuovo: dropdown device a livello canzone
+        dropdown_device_canzone,
         btn_aggiungi,
         container_tracce,
         bottoni_finali,

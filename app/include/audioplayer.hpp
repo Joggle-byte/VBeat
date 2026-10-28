@@ -69,6 +69,9 @@ public:
 
     AudioBus* get_bus(int bus_id);
 
+    void set_bus_muted(int bus_id, bool do_mute);
+    bool is_bus_muted(int bus_id);
+
     Song* get_queued_song(int song_id) const;
     Song* get_current_song() const;
     

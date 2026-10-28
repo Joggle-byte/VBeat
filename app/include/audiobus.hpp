@@ -41,6 +41,8 @@ public:
 
     AudioTrack get_track() const { return track; }
 
+    bool is_muted() const { return muted; }
+
 private:
     AudioTrack track;
 
@@ -50,7 +52,7 @@ private:
 
     float volume = 1.0; 
 
-    bool has_finished_playing = false;
+    bool muted;
 
     bool generate_channel_map(const int channel_idx, const int max_channels);
 };
