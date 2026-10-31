@@ -81,17 +81,25 @@ Song* Song::create_from_file(const fs::path& path) {
     json data;
     file >> data;
 
+    bool update_file_flag = false;
+
     try {
         new_song->name = data["name"];
         new_song->device_id = data["device"];
 
         for(const auto& track : data["tracks"]) {
+            bool muted = false;
+
+            if(track.contains("muted")) {
+                muted = track["muted"];
+            } else update_file_flag = true;
+
             new_song->add_track(AudioTrack(
                 track["name"],
                 track["path"],
                 track["volume"],
                 track["channel"],
-                track["muted"]
+                muted
             ));
         }
 
@@ -103,6 +111,9 @@ Song* Song::create_from_file(const fs::path& path) {
     } catch(...) {
         return nullptr;
     }
+
+    if(update_file_flag)
+        new_song->save_to_file(path);
 
     return new_song;
 }
